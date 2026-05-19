@@ -28,6 +28,7 @@ class _LoginPageState extends State<LoginPage> {
 
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
+    FocusScope.of(context).unfocus();
 
     setState(() => _isLoading = true);
 
@@ -37,15 +38,7 @@ class _LoginPageState extends State<LoginPage> {
         password: _passwordController.text,
       );
 
-      /*
-       * AuthApi.login() mengembalikan object AuthLoginResponse,
-       * bukan Map<String, dynamic>.
-       *
-       * Jadi token dibaca dari property result.token,
-       * bukan result['token'].
-       */
       final token = result.token.trim();
-
       if (token.isEmpty) {
         throw Exception('Token tidak ditemukan dari response login Laravel.');
       }
@@ -53,287 +46,275 @@ class _LoginPageState extends State<LoginPage> {
       await TokenStorage.saveToken(token);
 
       if (!mounted) return;
-
-      Navigator.of(
-        context,
-      ).pushNamedAndRemoveUntil(AppRoutes.recommendation, (route) => false);
+      Navigator.of(context).pushNamedAndRemoveUntil(
+        AppRoutes.recommendation,
+        (route) => false,
+      );
     } catch (error) {
       if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(error.toString().replaceFirst('Exception: ', '')),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      _showSnack(error.toString().replaceFirst('Exception: ', ''));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
+  void _showSnack(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: const Color(0xFFF3F6FA),
       body: SafeArea(
-        child: SingleChildScrollView(
+        child: ListView(
           padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 18),
-              Row(
-                children: [
-                  Container(
-                    height: 46,
-                    width: 46,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(16),
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF020617), Color(0xFF2563EB)],
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFF1D4ED8).withOpacity(0.25),
-                          blurRadius: 18,
-                          offset: const Offset(0, 8),
-                        ),
-                      ],
-                    ),
-                    child: const Center(
-                      child: Text(
-                        'T',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 22,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  const Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'TourHub Bali',
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w900,
-                          color: Color(0xFF020617),
-                        ),
-                      ),
-                      Text(
-                        'Rekomendasi Wisata CBF + CARS',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF64748B),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              const SizedBox(height: 26),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(22),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(28),
-                  gradient: const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      Color(0xFF020617),
-                      Color(0xFF1E3A8A),
-                      Color(0xFF2563EB),
-                    ],
+          children: [
+            const SizedBox(height: 10),
+            const _BrandHeader(),
+            const SizedBox(height: 24),
+            const _HeroLoginCard(),
+            const SizedBox(height: 18),
+            _LoginFormCard(
+              formKey: _formKey,
+              emailController: _emailController,
+              passwordController: _passwordController,
+              obscurePassword: _obscurePassword,
+              isLoading: _isLoading,
+              onTogglePassword: () => setState(() => _obscurePassword = !_obscurePassword),
+              onSubmit: _login,
+            ),
+            const SizedBox(height: 18),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Text(
+                  'Belum punya akun?',
+                  style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                ),
+                TextButton(
+                  onPressed: _isLoading ? null : () => Navigator.pushNamed(context, AppRoutes.register),
+                  child: const Text(
+                    'Daftar sekarang',
+                    style: TextStyle(fontWeight: FontWeight.w900),
                   ),
                 ),
-                child: const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Machine Learning Recommendation System',
-                      style: TextStyle(
-                        color: Color(0xFFBFDBFE),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    SizedBox(height: 14),
-                    Text(
-                      'Masuk dulu untuk mulai rekomendasi wisata.',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 26,
-                        height: 1.2,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    SizedBox(height: 12),
-                    Text(
-                      'Setiap hasil rekomendasi akan disimpan sebagai riwayat user di Laravel.',
-                      style: TextStyle(
-                        color: Color(0xFFE2E8F0),
-                        height: 1.5,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 22),
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(28),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF0F172A).withOpacity(0.06),
-                      blurRadius: 24,
-                      offset: const Offset(0, 12),
-                    ),
-                  ],
-                ),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Login User',
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w900,
-                          color: Color(0xFF020617),
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      const Text(
-                        'Gunakan akun yang sama dengan web TourHub.',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Color(0xFF64748B),
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(height: 18),
-                      TextFormField(
-                        controller: _emailController,
-                        keyboardType: TextInputType.emailAddress,
-                        decoration: _inputDecoration(
-                          label: 'Email',
-                          icon: Icons.email_outlined,
-                        ),
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'Email wajib diisi.';
-                          }
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
-                          if (!value.contains('@')) {
-                            return 'Format email tidak valid.';
-                          }
+class _BrandHeader extends StatelessWidget {
+  const _BrandHeader();
 
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 14),
-                      TextFormField(
-                        controller: _passwordController,
-                        obscureText: _obscurePassword,
-                        decoration:
-                            _inputDecoration(
-                              label: 'Password',
-                              icon: Icons.lock_outline,
-                            ).copyWith(
-                              suffixIcon: IconButton(
-                                onPressed: () {
-                                  setState(
-                                    () => _obscurePassword = !_obscurePassword,
-                                  );
-                                },
-                                icon: Icon(
-                                  _obscurePassword
-                                      ? Icons.visibility_outlined
-                                      : Icons.visibility_off_outlined,
-                                ),
-                              ),
-                            ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Password wajib diisi.';
-                          }
-
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 20),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 54,
-                        child: ElevatedButton.icon(
-                          onPressed: _isLoading ? null : _login,
-                          icon: _isLoading
-                              ? const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Icon(Icons.login_rounded),
-                          label: Text(_isLoading ? 'Memproses...' : 'Masuk'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF020617),
-                            foregroundColor: Colors.white,
-                            disabledBackgroundColor: const Color(0xFFCBD5E1),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(18),
-                            ),
-                            textStyle: const TextStyle(
-                              fontWeight: FontWeight.w900,
-                              fontSize: 15,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          height: 48,
+          width: 48,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(17),
+            gradient: const LinearGradient(
+              colors: [Color(0xFF020617), Color(0xFF2563EB)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF1D4ED8).withOpacity(0.25),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
               ),
             ],
           ),
+          child: const Center(
+            child: Text('T', style: TextStyle(color: Colors.white, fontSize: 23, fontWeight: FontWeight.w900)),
+          ),
+        ),
+        const SizedBox(width: 12),
+        const Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('TourHub Bali', style: TextStyle(fontSize: 23, fontWeight: FontWeight.w900, color: Color(0xFF020617))),
+              Text('Rekomendasi Wisata CBF + CARS', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF64748B))),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _HeroLoginCard extends StatelessWidget {
+  const _HeroLoginCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(30),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF020617), Color(0xFF1E3A8A), Color(0xFF2563EB)],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF1D4ED8).withOpacity(0.18),
+            blurRadius: 28,
+            offset: const Offset(0, 16),
+          ),
+        ],
+      ),
+      child: const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _GlassBadge(text: 'Machine Learning Recommendation System'),
+          SizedBox(height: 16),
+          Text(
+            'Masuk dulu untuk mulai rekomendasi wisata.',
+            style: TextStyle(color: Colors.white, fontSize: 28, height: 1.15, fontWeight: FontWeight.w900),
+          ),
+          SizedBox(height: 12),
+          Text(
+            'Setiap hasil rekomendasi akan disimpan sebagai riwayat user di Laravel.',
+            style: TextStyle(color: Color(0xFFE2E8F0), height: 1.5, fontSize: 14, fontWeight: FontWeight.w500),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LoginFormCard extends StatelessWidget {
+  const _LoginFormCard({
+    required this.formKey,
+    required this.emailController,
+    required this.passwordController,
+    required this.obscurePassword,
+    required this.isLoading,
+    required this.onTogglePassword,
+    required this.onSubmit,
+  });
+
+  final GlobalKey<FormState> formKey;
+  final TextEditingController emailController;
+  final TextEditingController passwordController;
+  final bool obscurePassword;
+  final bool isLoading;
+  final VoidCallback onTogglePassword;
+  final VoidCallback onSubmit;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(30),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(color: const Color(0xFF0F172A).withOpacity(0.06), blurRadius: 24, offset: const Offset(0, 12)),
+        ],
+      ),
+      child: Form(
+        key: formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Login User', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Color(0xFF020617))),
+            const SizedBox(height: 6),
+            const Text('Gunakan akun yang sama dengan web TourHub.', style: TextStyle(fontSize: 13, color: Color(0xFF64748B), fontWeight: FontWeight.w500)),
+            const SizedBox(height: 18),
+            TextFormField(
+              controller: emailController,
+              keyboardType: TextInputType.emailAddress,
+              decoration: _inputDecoration(label: 'Email', icon: Icons.email_outlined),
+              validator: (value) {
+                if (value == null || value.trim().isEmpty) return 'Email wajib diisi.';
+                if (!value.contains('@')) return 'Format email tidak valid.';
+                return null;
+              },
+            ),
+            const SizedBox(height: 14),
+            TextFormField(
+              controller: passwordController,
+              obscureText: obscurePassword,
+              decoration: _inputDecoration(label: 'Password', icon: Icons.lock_outline).copyWith(
+                suffixIcon: IconButton(
+                  onPressed: onTogglePassword,
+                  icon: Icon(obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined),
+                ),
+              ),
+              validator: (value) => value == null || value.isEmpty ? 'Password wajib diisi.' : null,
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              height: 54,
+              child: ElevatedButton.icon(
+                onPressed: isLoading ? null : onSubmit,
+                icon: isLoading
+                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Icon(Icons.login_rounded),
+                label: Text(isLoading ? 'Memproses...' : 'Masuk'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF020617),
+                  foregroundColor: Colors.white,
+                  disabledBackgroundColor: const Color(0xFFCBD5E1),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                  textStyle: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  InputDecoration _inputDecoration({
-    required String label,
-    required IconData icon,
-  }) {
+  InputDecoration _inputDecoration({required String label, required IconData icon}) {
     return InputDecoration(
       labelText: label,
       prefixIcon: Icon(icon),
       filled: true,
       fillColor: const Color(0xFFF8FAFC),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(18),
-        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.5)),
+    );
+  }
+}
+
+class _GlassBadge extends StatelessWidget {
+  const _GlassBadge({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.10),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white.withOpacity(0.12)),
       ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(18),
-        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(18),
-        borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.5),
-      ),
+      child: Text(text, style: const TextStyle(color: Color(0xFFBFDBFE), fontSize: 11, fontWeight: FontWeight.w900)),
     );
   }
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/routes/app_routes.dart';
 import '../../../core/storage/token_storage.dart';
+import '../../auth/data/auth_api.dart';
 import '../data/recommendation_api.dart';
 import '../data/tourhub_location.dart';
 
@@ -34,9 +35,11 @@ class _RecommendationPageState extends State<RecommendationPage> {
   }
 
   Future<void> _logout() async {
-    await TokenStorage.clearToken();
+    await AuthApi.logout();
     if (!mounted) return;
-    Navigator.of(context).pushNamedAndRemoveUntil(AppRoutes.login, (_) => false);
+    Navigator.of(
+      context,
+    ).pushNamedAndRemoveUntil(AppRoutes.login, (_) => false);
   }
 
   Future<void> _submit() async {
@@ -45,6 +48,7 @@ class _RecommendationPageState extends State<RecommendationPage> {
       return;
     }
 
+    FocusScope.of(context).unfocus();
     setState(() => _isLoading = true);
 
     try {
@@ -64,8 +68,19 @@ class _RecommendationPageState extends State<RecommendationPage> {
       setState(() => _result = response);
       _showSnack('Rekomendasi berhasil dihitung.');
     } catch (e) {
+      final message = e.toString().replaceFirst('Exception: ', '');
+      if (message.toLowerCase().contains('login') ||
+          message.toLowerCase().contains('token')) {
+        await TokenStorage.clearToken();
+        if (!mounted) return;
+        Navigator.of(
+          context,
+        ).pushNamedAndRemoveUntil(AppRoutes.login, (_) => false);
+        return;
+      }
+
       if (!mounted) return;
-      _showSnack(e.toString().replaceFirst('Exception: ', ''));
+      _showSnack(message);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -73,15 +88,24 @@ class _RecommendationPageState extends State<RecommendationPage> {
 
   void _showSnack(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
+      SnackBar(
+        content: Text(message),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final recommendations = ((_result?['data']?['recommendations'] ?? []) as List?) ?? [];
-    final weatherUsed = _result?['data']?['weather_used']?.toString();
-    final totalCandidates = _result?['data']?['total_candidates']?.toString();
+    final data = _result?['data'];
+    final dataMap = data is Map
+        ? Map<String, dynamic>.from(data)
+        : <String, dynamic>{};
+    final recommendations = ((dataMap['recommendations'] ?? []) as List?) ?? [];
+    final weatherUsed = dataMap['weather_used']?.toString() ?? '-';
+    final totalCandidates = dataMap['total_candidates']?.toString() ?? '-';
+    final responseTime = (_result?['response_time_ms'] ?? '-').toString();
 
     return Scaffold(
       backgroundColor: const Color(0xFFF3F6FA),
@@ -98,31 +122,37 @@ class _RecommendationPageState extends State<RecommendationPage> {
             ),
             Text(
               'Rekomendasi CBF + CARS',
-              style: TextStyle(fontSize: 11, color: Colors.blueGrey),
+              style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
             ),
           ],
         ),
         actions: [
-          TextButton(
-            onPressed: _logout,
-            child: const Text('Logout'),
+          IconButton(
+            tooltip: 'Riwayat',
+            onPressed: () => Navigator.pushNamed(context, AppRoutes.history),
+            icon: const Icon(Icons.history_rounded),
           ),
-          const SizedBox(width: 8),
+          TextButton(onPressed: _logout, child: const Text('Logout')),
+          const SizedBox(width: 6),
         ],
       ),
       body: RefreshIndicator(
-        onRefresh: () async => _submit(),
+        onRefresh: () async {
+          if (_result != null) await _submit();
+        },
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            _HeroCard(),
+            const _HeroCard(),
             const SizedBox(height: 14),
             _FormCard(
               selectedCategories: _selectedCategories,
               onToggleCategory: (category) {
                 setState(() {
                   if (_selectedCategories.contains(category)) {
-                    _selectedCategories.remove(category);
+                    if (_selectedCategories.length > 1) {
+                      _selectedCategories.remove(category);
+                    }
                   } else {
                     _selectedCategories.add(category);
                   }
@@ -148,51 +178,65 @@ class _RecommendationPageState extends State<RecommendationPage> {
               useBmkg: _useBmkg,
               onUseBmkgChanged: (value) => setState(() => _useBmkg = value),
               isHighSeason: _isHighSeason,
-              onHighSeasonChanged: (value) => setState(() => _isHighSeason = value),
+              onHighSeasonChanged: (value) =>
+                  setState(() => _isHighSeason = value),
               isLoading: _isLoading,
               onSubmit: _submit,
             ),
             if (_result != null) ...[
               const SizedBox(height: 16),
-              _ResultHeader(
-                weatherUsed: weatherUsed ?? '-',
-                totalCandidates: totalCandidates ?? '-',
-                responseTimeMs: (_result?['response_time_ms'] ?? '-').toString(),
+              _ResultSummary(
+                weatherUsed: weatherUsed,
+                totalCandidates: totalCandidates,
+                responseTimeMs: responseTime,
+                totalOutput: recommendations.length,
               ),
+              const SizedBox(height: 16),
+              _SectionTitle(total: recommendations.length),
               const SizedBox(height: 12),
               if (recommendations.isEmpty)
-                _EmptyResultCard()
+                const _EmptyResultCard()
               else
                 ...recommendations.asMap().entries.map((entry) {
                   final item = Map<String, dynamic>.from(entry.value as Map);
-                  return _RecommendationItemCard(
-                    rank: entry.key + 1,
-                    item: item,
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 14),
+                    child: _RecommendationItemCard(
+                      rank: entry.key + 1,
+                      item: item,
+                    ),
                   );
                 }),
             ],
           ],
         ),
       ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => Navigator.pushNamed(context, AppRoutes.history),
+        icon: const Icon(Icons.history_rounded),
+        label: const Text('Riwayat'),
+      ),
     );
   }
 }
 
 class _HeroCard extends StatelessWidget {
+  const _HeroCard();
+
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(26),
+        borderRadius: BorderRadius.circular(30),
         gradient: const LinearGradient(
-          colors: [Color(0xFF071329), Color(0xFF1D4ED8)],
+          colors: [Color(0xFF020617), Color(0xFF1E3A8A), Color(0xFF2563EB)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.blue.withOpacity(0.18),
+            color: const Color(0xFF2563EB).withOpacity(0.18),
             blurRadius: 26,
             offset: const Offset(0, 14),
           ),
@@ -201,21 +245,26 @@ class _HeroCard extends StatelessWidget {
       child: const Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Chip(
-            label: Text('Machine Learning Recommendation System'),
-            labelStyle: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
-            backgroundColor: Color(0x332196F3),
-            side: BorderSide.none,
-          ),
-          SizedBox(height: 14),
+          _GlassBadge(text: 'Machine Learning Recommendation System'),
+          SizedBox(height: 16),
           Text(
             'Pilihan utama untuk jelajahi Bali',
-            style: TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w900, height: 1.15),
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 27,
+              fontWeight: FontWeight.w900,
+              height: 1.15,
+            ),
           ),
           SizedBox(height: 10),
           Text(
             'CBF menghitung kecocokan preferensi, CARS menyesuaikan hasil berdasarkan cuaca, hari kunjungan, dan high season.',
-            style: TextStyle(color: Color(0xFFD8E5FF), height: 1.5),
+            style: TextStyle(
+              color: Color(0xFFE2E8F0),
+              height: 1.5,
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ],
       ),
@@ -272,69 +321,134 @@ class _FormCard extends StatelessWidget {
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(26),
-        boxShadow: const [
-          BoxShadow(color: Color(0x140F172A), blurRadius: 18, offset: Offset(0, 10)),
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withOpacity(0.06),
+            blurRadius: 24,
+            offset: const Offset(0, 12),
+          ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Travel Planner', style: TextStyle(color: Colors.blue, fontWeight: FontWeight.w900, fontSize: 12)),
+          const Text(
+            'Travel Planner',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w900,
+              color: Color(0xFF2563EB),
+              letterSpacing: 1.1,
+            ),
+          ),
           const SizedBox(height: 4),
-          const Text('Mau liburan ke mana?', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
+          const Text(
+            'Mau liburan ke mana?',
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.w900,
+              color: Color(0xFF020617),
+            ),
+          ),
           const SizedBox(height: 6),
-          const Text('Isi parameter rekomendasi, lalu sistem akan menghitung ranking destinasi terbaik.', style: TextStyle(color: Colors.blueGrey)),
+          const Text(
+            'Isi parameter rekomendasi, lalu sistem akan menghitung ranking destinasi terbaik.',
+            style: TextStyle(
+              color: Color(0xFF64748B),
+              fontWeight: FontWeight.w500,
+            ),
+          ),
           const SizedBox(height: 18),
-          const Text('Kategori Preferensi', style: TextStyle(fontWeight: FontWeight.w800)),
+          const Text(
+            'Kategori Preferensi',
+            style: TextStyle(fontWeight: FontWeight.w900),
+          ),
           const SizedBox(height: 10),
           Wrap(
-            spacing: 8,
-            runSpacing: 8,
+            spacing: 10,
+            runSpacing: 10,
             children: ['Alam', 'Budaya', 'Rekreasi', 'Umum'].map((category) {
               final selected = selectedCategories.contains(category);
               return ChoiceChip(
                 selected: selected,
                 label: Text(category),
                 onSelected: (_) => onToggleCategory(category),
+                selectedColor: const Color(0xFFDBEAFE),
+                backgroundColor: Colors.white,
+                side: BorderSide(
+                  color: selected
+                      ? const Color(0xFF93C5FD)
+                      : const Color(0xFFE2E8F0),
+                ),
+                labelStyle: TextStyle(
+                  fontWeight: FontWeight.w900,
+                  color: selected
+                      ? const Color(0xFF1D4ED8)
+                      : const Color(0xFF334155),
+                ),
               );
             }).toList(),
           ),
           const SizedBox(height: 16),
           DropdownButtonFormField<TourHubLocation>(
             value: selectedLocation,
+            isExpanded: true,
+            decoration: _inputDecoration(label: 'Lokasi Wisata'),
             items: tourHubLocations
-                .map((location) => DropdownMenuItem(
-                      value: location,
-                      child: Text(location.label, overflow: TextOverflow.ellipsis),
-                    ))
+                .map(
+                  (location) => DropdownMenuItem(
+                    value: location,
+                    child: Text(
+                      location.label,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                )
                 .toList(),
             onChanged: onLocationChanged,
-            decoration: const InputDecoration(labelText: 'Lokasi Wisata'),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
+          const Text(
+            'Lokasi sudah dipasangkan manual agar kecamatan sesuai kabupaten.',
+            style: TextStyle(
+              fontSize: 12,
+              color: Color(0xFF64748B),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 14),
           TextField(
             controller: keywordController,
-            decoration: const InputDecoration(labelText: 'Keywords', hintText: 'Contoh: pantai, sunset'),
+            decoration: _inputDecoration(
+              label: 'Keywords',
+            ).copyWith(hintText: 'Contoh: pantai, sunset'),
           ),
           const SizedBox(height: 14),
           Row(
             children: [
               Expanded(
-                child: _NumberBox(
+                child: _StepperBox(
                   label: 'Min Rating',
                   value: minRating.toStringAsFixed(1),
-                  onMinus: () => onMinRatingChanged((minRating - 0.1).clamp(0.0, 5.0)),
-                  onPlus: () => onMinRatingChanged((minRating + 0.1).clamp(0.0, 5.0)),
+                  onMinus: () => onMinRatingChanged(
+                    ((minRating - 0.1).clamp(0.0, 5.0)).toDouble(),
+                  ),
+                  onPlus: () => onMinRatingChanged(
+                    ((minRating + 0.1).clamp(0.0, 5.0)).toDouble(),
+                  ),
                 ),
               ),
               const SizedBox(width: 10),
               Expanded(
-                child: _NumberBox(
+                child: _StepperBox(
                   label: 'Top N',
                   value: topN.toString(),
-                  onMinus: () => onTopNChanged((topN - 1).clamp(1, 50)),
-                  onPlus: () => onTopNChanged((topN + 1).clamp(1, 50)),
+                  onMinus: () =>
+                      onTopNChanged(((topN - 1).clamp(1, 50)).toInt()),
+                  onPlus: () =>
+                      onTopNChanged(((topN + 1).clamp(1, 50)).toInt()),
                 ),
               ),
             ],
@@ -345,60 +459,106 @@ class _FormCard extends StatelessWidget {
               Expanded(
                 child: DropdownButtonFormField<String>(
                   value: weather,
-                  items: ['cerah', 'hujan', 'mendung', 'berawan', 'unknown']
-                      .map((item) => DropdownMenuItem(value: item, child: Text(item)))
-                      .toList(),
+                  decoration: _inputDecoration(label: 'Cuaca Manual'),
+                  items:
+                      const ['cerah', 'hujan', 'mendung', 'berawan', 'unknown']
+                          .map(
+                            (item) => DropdownMenuItem(
+                              value: item,
+                              child: Text(item),
+                            ),
+                          )
+                          .toList(),
                   onChanged: onWeatherChanged,
-                  decoration: const InputDecoration(labelText: 'Cuaca Manual'),
                 ),
               ),
               const SizedBox(width: 10),
               Expanded(
                 child: DropdownButtonFormField<String>(
                   value: visitDay,
-                  items: ['weekday', 'weekend']
-                      .map((item) => DropdownMenuItem(value: item, child: Text(item)))
+                  decoration: _inputDecoration(label: 'Hari'),
+                  items: const ['weekday', 'weekend']
+                      .map(
+                        (item) =>
+                            DropdownMenuItem(value: item, child: Text(item)),
+                      )
                       .toList(),
                   onChanged: onVisitDayChanged,
-                  decoration: const InputDecoration(labelText: 'Hari'),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('Gunakan BMKG', style: TextStyle(fontWeight: FontWeight.w800)),
-            subtitle: const Text('Prakiraan ±3 hari, interval sekitar 3 jam.'),
+          const SizedBox(height: 16),
+          _SwitchRow(
+            title: 'Gunakan BMKG',
+            subtitle: 'Prakiraan ±3 hari, interval sekitar 3 jam.',
             value: useBmkg,
             onChanged: onUseBmkgChanged,
           ),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('High Season', style: TextStyle(fontWeight: FontWeight.w800)),
-            subtitle: const Text('Simulasi kondisi ramai wisatawan.'),
+          _SwitchRow(
+            title: 'High Season',
+            subtitle: 'Simulasi kondisi ramai wisatawan.',
             value: isHighSeason,
             onChanged: onHighSeasonChanged,
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
           SizedBox(
             width: double.infinity,
-            child: FilledButton.icon(
+            height: 54,
+            child: ElevatedButton.icon(
               onPressed: isLoading ? null : onSubmit,
               icon: isLoading
-                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Icon(Icons.search),
-              label: Text(isLoading ? 'Menghitung...' : 'Cari Rekomendasi Wisata'),
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(Icons.search_rounded),
+              label: Text(
+                isLoading ? 'Menghitung...' : 'Cari Rekomendasi Wisata',
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF5267A5),
+                foregroundColor: Colors.white,
+                disabledBackgroundColor: const Color(0xFFCBD5E1),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                textStyle: const TextStyle(fontWeight: FontWeight.w900),
+              ),
             ),
           ),
         ],
       ),
     );
   }
+
+  InputDecoration _inputDecoration({required String label}) {
+    return InputDecoration(
+      labelText: label,
+      filled: true,
+      fillColor: const Color(0xFFF8FAFC),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(18),
+        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(18),
+        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(18),
+        borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.5),
+      ),
+    );
+  }
 }
 
-class _NumberBox extends StatelessWidget {
-  const _NumberBox({
+class _StepperBox extends StatelessWidget {
+  const _StepperBox({
     required this.label,
     required this.value,
     required this.onMinus,
@@ -413,23 +573,44 @@ class _NumberBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: const TextStyle(fontSize: 12, color: Colors.blueGrey, fontWeight: FontWeight.w700)),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Color(0xFF64748B),
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 10),
           Row(
             children: [
-              IconButton(onPressed: onMinus, icon: const Icon(Icons.remove_circle_outline)),
-              Expanded(
-                child: Text(value, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+              InkWell(
+                onTap: onMinus,
+                child: const Icon(Icons.remove_circle_outline_rounded),
               ),
-              IconButton(onPressed: onPlus, icon: const Icon(Icons.add_circle_outline)),
+              Expanded(
+                child: Text(
+                  value,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 17,
+                  ),
+                ),
+              ),
+              InkWell(
+                onTap: onPlus,
+                child: const Icon(Icons.add_circle_outline_rounded),
+              ),
             ],
           ),
         ],
@@ -438,16 +619,68 @@ class _NumberBox extends StatelessWidget {
   }
 }
 
-class _ResultHeader extends StatelessWidget {
-  const _ResultHeader({
+class _SwitchRow extends StatelessWidget {
+  const _SwitchRow({
+    required this.title,
+    required this.subtitle,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final String title;
+  final String subtitle;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF020617),
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  subtitle,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF64748B),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Switch(value: value, onChanged: onChanged),
+        ],
+      ),
+    );
+  }
+}
+
+class _ResultSummary extends StatelessWidget {
+  const _ResultSummary({
     required this.weatherUsed,
     required this.totalCandidates,
     required this.responseTimeMs,
+    required this.totalOutput,
   });
 
   final String weatherUsed;
   final String totalCandidates;
   final String responseTimeMs;
+  final int totalOutput;
 
   @override
   Widget build(BuildContext context) {
@@ -455,18 +688,93 @@ class _ResultHeader extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(26),
         border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
       child: Wrap(
-        spacing: 8,
-        runSpacing: 8,
+        spacing: 10,
+        runSpacing: 10,
         children: [
-          Chip(label: Text('Cuaca: $weatherUsed')),
-          Chip(label: Text('Candidates: $totalCandidates')),
-          Chip(label: Text('Response: $responseTimeMs ms')),
+          _SummaryPill(label: 'Cuaca', value: weatherUsed),
+          _SummaryPill(label: 'Candidates', value: totalCandidates),
+          _SummaryPill(label: 'Output', value: totalOutput.toString()),
+          _SummaryPill(label: 'Response', value: '$responseTimeMs ms'),
         ],
       ),
+    );
+  }
+}
+
+class _SummaryPill extends StatelessWidget {
+  const _SummaryPill({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Text(
+        '$label: $value',
+        style: const TextStyle(
+          color: Color(0xFF334155),
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
+  }
+}
+
+class _SectionTitle extends StatelessWidget {
+  const _SectionTitle({required this.total});
+
+  final int total;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        const Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Semua Kandidat Rekomendasi',
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
+              ),
+              Text(
+                'Diurutkan dari final score tertinggi.',
+                style: TextStyle(
+                  color: Color(0xFF64748B),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: const Color(0xFF020617),
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Text(
+            'Total $total',
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w900,
+              fontSize: 12,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -482,34 +790,133 @@ class _RecommendationItemCard extends StatelessWidget {
     final imageUrl = item['link_gambar']?.toString();
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: rank == 1 ? const Color(0xFFF59E0B) : const Color(0xFFE2E8F0)),
-        boxShadow: const [BoxShadow(color: Color(0x120F172A), blurRadius: 16, offset: Offset(0, 8))],
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(
+          color: rank == 1 ? const Color(0xFFFACC15) : const Color(0xFFE2E8F0),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           ClipRRect(
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
             child: SizedBox(
-              height: 180,
+              height: 230,
               width: double.infinity,
-              child: imageUrl == null || imageUrl.isEmpty
-                  ? const ColoredBox(
-                      color: Color(0xFFE2E8F0),
-                      child: Center(child: Text('No Image')),
-                    )
-                  : Image.network(
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  if (imageUrl != null && imageUrl.isNotEmpty)
+                    Image.network(
                       imageUrl,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const ColoredBox(
-                        color: Color(0xFFE2E8F0),
-                        child: Center(child: Text('Gambar tidak bisa dimuat')),
+                      errorBuilder: (_, __, ___) => const _ImageFallback(),
+                    )
+                  else
+                    const _ImageFallback(),
+                  const DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [Colors.transparent, Color(0xCC020617)],
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
                       ),
                     ),
+                  ),
+                  Positioned(
+                    top: 16,
+                    left: 16,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: rank == 1
+                            ? const Color(0xFFFACC15)
+                            : const Color(0xFF020617),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        '#$rank',
+                        style: TextStyle(
+                          color: rank == 1
+                              ? const Color(0xFF020617)
+                              : Colors.white,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    left: 18,
+                    right: 18,
+                    bottom: 18,
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                (item['nama_tempat_wisata'] ?? '-').toString(),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 25,
+                                  height: 1.08,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                '${item['kecamatan'] ?? '-'} - ${item['kabupaten_kota'] ?? '-'}',
+                                style: const TextStyle(
+                                  color: Color(0xFFE2E8F0),
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.92),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Column(
+                            children: [
+                              const Text(
+                                'Score',
+                                style: TextStyle(
+                                  color: Color(0xFF64748B),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              Text(
+                                (item['final_score'] ?? '-').toString(),
+                                style: const TextStyle(
+                                  color: Color(0xFF020617),
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
           Padding(
@@ -521,37 +928,66 @@ class _RecommendationItemCard extends StatelessWidget {
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    Chip(label: Text('#$rank')),
-                    Chip(label: Text(item['kategori']?.toString() ?? '-')),
-                    Chip(label: Text(item['tipe_wisata']?.toString() ?? '-')),
+                    if (rank == 1)
+                      const _GoldBadge(text: '🏆 Paling Direkomendasikan'),
+                    _BlueBadge(text: (item['kategori'] ?? '-').toString()),
+                    _GrayBadge(text: (item['tipe_wisata'] ?? '-').toString()),
                   ],
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  item['nama_tempat_wisata']?.toString() ?? '-',
-                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '${item['kecamatan'] ?? '-'} - ${item['kabupaten_kota'] ?? '-'}',
-                  style: const TextStyle(color: Colors.blueGrey, fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
+                const SizedBox(height: 14),
+                Row(
                   children: [
-                    _MetricChip(label: 'Rating', value: '${item['rating'] ?? '-'}'),
-                    _MetricChip(label: 'Ulasan', value: '${item['jumlah_rating'] ?? '-'}'),
-                    _MetricChip(label: 'CBF', value: '${item['cbf_score'] ?? '-'}'),
-                    _MetricChip(label: 'Final', value: '${item['final_score'] ?? '-'}'),
+                    Expanded(
+                      child: _MetricBox(
+                        label: 'Rating',
+                        value: (item['rating'] ?? '-').toString(),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _MetricBox(
+                        label: 'Ulasan',
+                        value: (item['jumlah_rating'] ?? '-').toString(),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _MetricBox(
+                        label: 'CBF',
+                        value: (item['cbf_score'] ?? '-').toString(),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _MetricBox(
+                        label: 'Context',
+                        value: (item['context_multiplier'] ?? '-').toString(),
+                      ),
+                    ),
                   ],
                 ),
                 if ((item['alasan'] ?? '').toString().isNotEmpty) ...[
                   const SizedBox(height: 12),
-                  Text(
-                    item['alasan'].toString(),
-                    style: const TextStyle(height: 1.5, color: Colors.black87),
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Text(
+                      (item['alasan'] ?? '').toString(),
+                      style: const TextStyle(
+                        color: Color(0xFF475569),
+                        height: 1.5,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
                 ],
               ],
@@ -563,52 +999,157 @@ class _RecommendationItemCard extends StatelessWidget {
   }
 }
 
-class _MetricChip extends StatelessWidget {
-  const _MetricChip({required this.label, required this.value});
-
+class _MetricBox extends StatelessWidget {
+  const _MetricBox({required this.label, required this.value});
   final String label;
   final String value;
-
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 132,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(16),
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: const Color(0xFFF8FAFC),
+      borderRadius: BorderRadius.circular(18),
+      border: Border.all(color: const Color(0xFFE2E8F0)),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            color: Color(0xFF64748B),
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: const TextStyle(
+            color: Color(0xFF020617),
+            fontSize: 16,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _BlueBadge extends StatelessWidget {
+  const _BlueBadge({required this.text});
+  final String text;
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+    decoration: BoxDecoration(
+      color: const Color(0xFFDBEAFE),
+      borderRadius: BorderRadius.circular(999),
+    ),
+    child: Text(
+      text,
+      style: const TextStyle(
+        color: Color(0xFF1D4ED8),
+        fontSize: 11,
+        fontWeight: FontWeight.w900,
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: const TextStyle(fontSize: 11, color: Colors.blueGrey, fontWeight: FontWeight.w800)),
-          const SizedBox(height: 4),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.w900)),
-        ],
+    ),
+  );
+}
+
+class _GrayBadge extends StatelessWidget {
+  const _GrayBadge({required this.text});
+  final String text;
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+    decoration: BoxDecoration(
+      color: const Color(0xFFF1F5F9),
+      borderRadius: BorderRadius.circular(999),
+    ),
+    child: Text(
+      text,
+      style: const TextStyle(
+        color: Color(0xFF475569),
+        fontSize: 11,
+        fontWeight: FontWeight.w900,
       ),
-    );
-  }
+    ),
+  );
+}
+
+class _GoldBadge extends StatelessWidget {
+  const _GoldBadge({required this.text});
+  final String text;
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+    decoration: BoxDecoration(
+      color: const Color(0xFFFEF3C7),
+      borderRadius: BorderRadius.circular(999),
+    ),
+    child: Text(
+      text,
+      style: const TextStyle(
+        color: Color(0xFFB45309),
+        fontSize: 11,
+        fontWeight: FontWeight.w900,
+      ),
+    ),
+  );
+}
+
+class _GlassBadge extends StatelessWidget {
+  const _GlassBadge({required this.text});
+  final String text;
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+    decoration: BoxDecoration(
+      color: Colors.white.withOpacity(0.10),
+      borderRadius: BorderRadius.circular(999),
+      border: Border.all(color: Colors.white.withOpacity(0.12)),
+    ),
+    child: Text(
+      text,
+      style: const TextStyle(
+        color: Color(0xFFBFDBFE),
+        fontSize: 11,
+        fontWeight: FontWeight.w900,
+      ),
+    ),
+  );
+}
+
+class _ImageFallback extends StatelessWidget {
+  const _ImageFallback();
+  @override
+  Widget build(BuildContext context) => Container(
+    color: const Color(0xFFE2E8F0),
+    child: const Center(
+      child: Icon(
+        Icons.image_not_supported_outlined,
+        color: Color(0xFF64748B),
+        size: 36,
+      ),
+    ),
+  );
 }
 
 class _EmptyResultCard extends StatelessWidget {
+  const _EmptyResultCard();
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: const Column(
-        children: [
-          Icon(Icons.explore_outlined, size: 42, color: Colors.blueGrey),
-          SizedBox(height: 10),
-          Text('Tidak ada rekomendasi', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
-          SizedBox(height: 6),
-          Text('Coba turunkan min rating, pilih lokasi lain, atau pilih lebih banyak kategori.', textAlign: TextAlign.center),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(24),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(28),
+      border: Border.all(color: const Color(0xFFE2E8F0)),
+    ),
+    child: const Text(
+      'Tidak ada rekomendasi. Coba turunkan min rating atau pilih kategori lain.',
+      textAlign: TextAlign.center,
+      style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w700),
+    ),
+  );
 }
