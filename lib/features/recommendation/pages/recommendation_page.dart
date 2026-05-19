@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/routes/app_routes.dart';
 import '../../../core/storage/token_storage.dart';
+import '../../../core/utils/maps_launcher.dart';
 import '../../auth/data/auth_api.dart';
 import '../data/recommendation_api.dart';
 import '../data/tourhub_location.dart';
@@ -788,6 +789,7 @@ class _RecommendationItemCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final imageUrl = item['link_gambar']?.toString();
+    final mapsUrl = item['link_google_maps']?.toString();
 
     return Container(
       decoration: BoxDecoration(
@@ -986,6 +988,30 @@ class _RecommendationItemCard extends StatelessWidget {
                         height: 1.5,
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+                if (mapsUrl != null && mapsUrl.trim().isNotEmpty) ...[
+                  const SizedBox(height: 14),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton.icon(
+                      onPressed: () => openGoogleMapsUrl(context, mapsUrl),
+                      icon: const Icon(Icons.map_outlined, size: 19),
+                      label: const Text('Buka Google Maps'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF059669),
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                        textStyle: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w900,
+                        ),
                       ),
                     ),
                   ),
