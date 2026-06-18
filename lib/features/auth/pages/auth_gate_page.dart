@@ -19,10 +19,11 @@ class _AuthGatePageState extends State<AuthGatePage> {
 
   Future<void> _checkAuth() async {
     final hasToken = await TokenStorage.hasToken();
+
     if (!mounted) return;
 
     Navigator.of(context).pushNamedAndRemoveUntil(
-      hasToken ? AppRoutes.recommendation : AppRoutes.login,
+      hasToken ? AppRoutes.dashboard : AppRoutes.login,
       (_) => false,
     );
   }
@@ -30,7 +31,7 @@ class _AuthGatePageState extends State<AuthGatePage> {
   @override
   Widget build(BuildContext context) {
     return const Scaffold(
-      backgroundColor: Color(0xFFF3F6FA),
+      backgroundColor: Color(0xFFF3F7FB),
       body: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -46,6 +47,14 @@ class _AuthGatePageState extends State<AuthGatePage> {
               ),
             ),
             SizedBox(height: 10),
+            Text(
+              'Memeriksa sesi login...',
+              style: TextStyle(
+                color: Color(0xFF64748B),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            SizedBox(height: 16),
             CircularProgressIndicator(),
           ],
         ),

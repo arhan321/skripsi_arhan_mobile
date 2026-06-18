@@ -11,7 +11,7 @@ class AuthUser {
   final String name;
   final String email;
 
-  factory AuthUser.fromJson(Map<String, dynamic> json) {
+  factory AuthUser.fromJson(Map json) {
     return AuthUser(
       id: int.tryParse((json['id'] ?? '0').toString()) ?? 0,
       name: (json['name'] ?? '').toString(),
@@ -33,16 +33,14 @@ class AuthLoginResponse {
   final String message;
   final AuthUser? user;
 
-  factory AuthLoginResponse.fromJson(Map<String, dynamic> json) {
+  factory AuthLoginResponse.fromJson(Map json) {
     final userJson = json['user'];
 
     return AuthLoginResponse(
       success: json['success'] == true,
       token: (json['token'] ?? '').toString(),
       message: (json['message'] ?? '').toString(),
-      user: userJson is Map<String, dynamic>
-          ? AuthUser.fromJson(userJson)
-          : null,
+      user: userJson is Map ? AuthUser.fromJson(userJson) : null,
     );
   }
 }
@@ -84,6 +82,32 @@ class AuthApi {
     );
   }
 
+  static Future<String> sendPasswordResetLink({required String email}) async {
+    final response = await _postJson(
+      Uri.parse('${AppConfig.apiBaseUrl}/auth/forgot-password'),
+      {'email': email},
+    );
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception(
+        _extractErrorMessage(
+          response.body,
+          'Gagal mengirim link reset password.',
+        ),
+      );
+    }
+
+    final decoded = jsonDecode(response.body);
+    if (decoded is Map) {
+      final message = decoded['message'];
+      if (message != null && message.toString().trim().isNotEmpty) {
+        return message.toString();
+      }
+    }
+
+    return 'Jika email terdaftar, link reset password sudah dikirim.';
+  }
+
   static Future<void> logout() async {
     final token = await TokenStorage.readToken();
 
@@ -105,6 +129,7 @@ class AuthApi {
 
   static Future<AuthUser?> me() async {
     final token = await TokenStorage.readToken();
+
     if (token == null || token.trim().isEmpty) return null;
 
     final response = await _getJson(
@@ -124,12 +149,12 @@ class AuthApi {
     }
 
     final decoded = jsonDecode(response.body);
-    if (decoded is! Map<String, dynamic>) return null;
+
+    if (decoded is! Map) return null;
 
     final userJson = decoded['user'];
-    return userJson is Map<String, dynamic>
-        ? AuthUser.fromJson(userJson)
-        : null;
+
+    return userJson is Map ? AuthUser.fromJson(userJson) : null;
   }
 
   static AuthLoginResponse _parseAuthResponse(
@@ -141,11 +166,13 @@ class AuthApi {
     }
 
     final decoded = jsonDecode(response.body);
-    if (decoded is! Map<String, dynamic>) {
+
+    if (decoded is! Map) {
       throw Exception('Format response auth tidak valid.');
     }
 
     final result = AuthLoginResponse.fromJson(decoded);
+
     if (!result.success || result.token.trim().isEmpty) {
       throw Exception(
         result.message.isNotEmpty ? result.message : fallbackMessage,
@@ -172,6 +199,7 @@ class AuthApi {
       }
 
       request.add(utf8.encode(jsonEncode(body)));
+
       final response = await request.close();
       final responseBody = await response.transform(utf8.decoder).join();
 
@@ -210,16 +238,21 @@ class AuthApi {
   static String _extractErrorMessage(String body, String fallback) {
     try {
       final decoded = jsonDecode(body);
-      if (decoded is Map<String, dynamic>) {
+
+      if (decoded is Map) {
         final message = decoded['message'];
+
         if (message != null && message.toString().trim().isNotEmpty) {
           return message.toString();
         }
 
         final errors = decoded['errors'];
+
         if (errors is Map && errors.isNotEmpty) {
           final first = errors.values.first;
+
           if (first is List && first.isNotEmpty) return first.first.toString();
+
           return first.toString();
         }
       }

@@ -28,8 +28,8 @@ class _LoginPageState extends State<LoginPage> {
 
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
-    FocusScope.of(context).unfocus();
 
+    FocusScope.of(context).unfocus();
     setState(() => _isLoading = true);
 
     try {
@@ -39,6 +39,7 @@ class _LoginPageState extends State<LoginPage> {
       );
 
       final token = result.token.trim();
+
       if (token.isEmpty) {
         throw Exception('Token tidak ditemukan dari response login Laravel.');
       }
@@ -46,6 +47,7 @@ class _LoginPageState extends State<LoginPage> {
       await TokenStorage.saveToken(token);
 
       if (!mounted) return;
+
       Navigator.of(context).pushNamedAndRemoveUntil(
         AppRoutes.recommendation,
         (route) => false,
@@ -60,27 +62,35 @@ class _LoginPageState extends State<LoginPage> {
 
   void _showSnack(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      ),
+      SnackBar(content: Text(message)),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF3F6FA),
+      backgroundColor: const Color(0xFFF3F7FB),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(18),
           children: [
-            const SizedBox(height: 10),
-            const _BrandHeader(),
-            const SizedBox(height: 24),
-            const _HeroLoginCard(),
+            _AuthTopBar(
+              onBack: _isLoading
+                  ? null
+                  : () => Navigator.pushNamedAndRemoveUntil(
+                        context,
+                        AppRoutes.landing,
+                        (_) => false,
+                      ),
+            ),
             const SizedBox(height: 18),
+            const _LuxuryAuthHero(
+              eyebrow: 'Masuk Akun Wisatawan',
+              title: 'Login TourHub',
+              description:
+                  'Login untuk melihat rekomendasi wisata, menyimpan riwayat pencarian, dan membuka dashboard user.',
+            ),
+            const SizedBox(height: 16),
             _LoginFormCard(
               formKey: _formKey,
               emailController: _emailController,
@@ -90,22 +100,13 @@ class _LoginPageState extends State<LoginPage> {
               onTogglePassword: () => setState(() => _obscurePassword = !_obscurePassword),
               onSubmit: _login,
             ),
-            const SizedBox(height: 18),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Text(
-                  'Belum punya akun?',
-                  style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w600),
-                ),
-                TextButton(
-                  onPressed: _isLoading ? null : () => Navigator.pushNamed(context, AppRoutes.register),
-                  child: const Text(
-                    'Daftar sekarang',
-                    style: TextStyle(fontWeight: FontWeight.w900),
-                  ),
-                ),
-              ],
+            const SizedBox(height: 16),
+            _AuthBottomSwitch(
+              text: 'Belum punya akun?',
+              actionText: 'Register sekarang',
+              onPressed: _isLoading
+                  ? null
+                  : () => Navigator.pushReplacementNamed(context, AppRoutes.register),
             ),
           ],
         ),
@@ -114,43 +115,75 @@ class _LoginPageState extends State<LoginPage> {
   }
 }
 
-class _BrandHeader extends StatelessWidget {
-  const _BrandHeader();
+class _AuthTopBar extends StatelessWidget {
+  const _AuthTopBar({required this.onBack});
+
+  final VoidCallback? onBack;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Container(
-          height: 48,
-          width: 48,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(17),
-            gradient: const LinearGradient(
-              colors: [Color(0xFF020617), Color(0xFF2563EB)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF1D4ED8).withOpacity(0.25),
-                blurRadius: 20,
-                offset: const Offset(0, 10),
+        InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: onBack,
+          child: Container(
+            height: 48,
+            width: 48,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(18),
+              gradient: const LinearGradient(
+                colors: [Color(0xFF020617), Color(0xFF2563EB)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
-            ],
-          ),
-          child: const Center(
-            child: Text('T', style: TextStyle(color: Colors.white, fontSize: 23, fontWeight: FontWeight.w900)),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF1D4ED8).withOpacity(0.25),
+                  blurRadius: 20,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: const Center(
+              child: Text(
+                'T',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 23,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
           ),
         ),
         const SizedBox(width: 12),
-        const Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('TourHub Bali', style: TextStyle(fontSize: 23, fontWeight: FontWeight.w900, color: Color(0xFF020617))),
-              Text('Rekomendasi Wisata CBF + CARS', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF64748B))),
-            ],
+        InkWell(
+          onTap: onBack,
+          borderRadius: BorderRadius.circular(14),
+          child: const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'TourHub Bali',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF020617),
+                  ),
+                ),
+                Text(
+                  'Smart Travel Recommendation',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFF64748B),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ],
@@ -158,19 +191,27 @@ class _BrandHeader extends StatelessWidget {
   }
 }
 
-class _HeroLoginCard extends StatelessWidget {
-  const _HeroLoginCard();
+class _LuxuryAuthHero extends StatelessWidget {
+  const _LuxuryAuthHero({
+    required this.eyebrow,
+    required this.title,
+    required this.description,
+  });
+
+  final String eyebrow;
+  final String title;
+  final String description;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(30),
+        borderRadius: BorderRadius.circular(32),
         gradient: const LinearGradient(
+          colors: [Color(0xFF020617), Color(0xFF172554), Color(0xFF2563EB)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF020617), Color(0xFF1E3A8A), Color(0xFF2563EB)],
         ),
         boxShadow: [
           BoxShadow(
@@ -180,19 +221,55 @@ class _HeroLoginCard extends StatelessWidget {
           ),
         ],
       ),
-      child: const Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Stack(
         children: [
-          _GlassBadge(text: 'Machine Learning Recommendation System'),
-          SizedBox(height: 16),
-          Text(
-            'Masuk dulu untuk mulai rekomendasi wisata.',
-            style: TextStyle(color: Colors.white, fontSize: 28, height: 1.15, fontWeight: FontWeight.w900),
+          Positioned(
+            right: -28,
+            top: -28,
+            child: Container(
+              height: 110,
+              width: 110,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.08),
+                shape: BoxShape.circle,
+              ),
+            ),
           ),
-          SizedBox(height: 12),
-          Text(
-            'Setiap hasil rekomendasi akan disimpan sebagai riwayat user di Laravel.',
-            style: TextStyle(color: Color(0xFFE2E8F0), height: 1.5, fontSize: 14, fontWeight: FontWeight.w500),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _GlassBadge(text: eyebrow),
+              const SizedBox(height: 16),
+              Text(
+                title,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 31,
+                  height: 1.12,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                description,
+                style: const TextStyle(
+                  color: Color(0xFFE2E8F0),
+                  fontSize: 13,
+                  height: 1.55,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 18),
+              const Row(
+                children: [
+                  Expanded(child: _MiniDarkStat(title: 'CBF', subtitle: 'Preferensi')),
+                  SizedBox(width: 10),
+                  Expanded(child: _MiniDarkStat(title: 'CARS', subtitle: 'Konteks')),
+                  SizedBox(width: 10),
+                  Expanded(child: _MiniDarkStat(title: 'BMKG', subtitle: 'Cuaca')),
+                ],
+              ),
+            ],
           ),
         ],
       ),
@@ -221,28 +298,34 @@ class _LoginFormCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(30),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: [
-          BoxShadow(color: const Color(0xFF0F172A).withOpacity(0.06), blurRadius: 24, offset: const Offset(0, 12)),
-        ],
-      ),
+    return _WhiteCard(
       child: Form(
         key: formKey,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Login User', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Color(0xFF020617))),
+            const Text(
+              'Login User',
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w900,
+                color: Color(0xFF020617),
+              ),
+            ),
             const SizedBox(height: 6),
-            const Text('Gunakan akun yang sama dengan web TourHub.', style: TextStyle(fontSize: 13, color: Color(0xFF64748B), fontWeight: FontWeight.w500)),
+            const Text(
+              'Gunakan akun yang sama dengan web TourHub.',
+              style: TextStyle(
+                fontSize: 13,
+                color: Color(0xFF64748B),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
             const SizedBox(height: 18),
             TextFormField(
               controller: emailController,
               keyboardType: TextInputType.emailAddress,
+              textInputAction: TextInputAction.next,
               decoration: _inputDecoration(label: 'Email', icon: Icons.email_outlined),
               validator: (value) {
                 if (value == null || value.trim().isEmpty) return 'Email wajib diisi.';
@@ -257,28 +340,40 @@ class _LoginFormCard extends StatelessWidget {
               decoration: _inputDecoration(label: 'Password', icon: Icons.lock_outline).copyWith(
                 suffixIcon: IconButton(
                   onPressed: onTogglePassword,
-                  icon: Icon(obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined),
+                  icon: Icon(
+                    obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                  ),
                 ),
               ),
               validator: (value) => value == null || value.isEmpty ? 'Password wajib diisi.' : null,
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 10),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: isLoading
+                    ? null
+                    : () => Navigator.pushNamed(context, AppRoutes.forgotPassword),
+                child: const Text(
+                  'Lupa password?',
+                  style: TextStyle(fontWeight: FontWeight.w900),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
             SizedBox(
               width: double.infinity,
               height: 54,
               child: ElevatedButton.icon(
                 onPressed: isLoading ? null : onSubmit,
                 icon: isLoading
-                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
                     : const Icon(Icons.login_rounded),
-                label: Text(isLoading ? 'Memproses...' : 'Masuk'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF020617),
-                  foregroundColor: Colors.white,
-                  disabledBackgroundColor: const Color(0xFFCBD5E1),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-                  textStyle: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
-                ),
+                label: Text(isLoading ? 'Memproses...' : 'Login'),
               ),
             ),
           ],
@@ -288,14 +383,111 @@ class _LoginFormCard extends StatelessWidget {
   }
 
   InputDecoration _inputDecoration({required String label, required IconData icon}) {
-    return InputDecoration(
-      labelText: label,
-      prefixIcon: Icon(icon),
-      filled: true,
-      fillColor: const Color(0xFFF8FAFC),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.5)),
+    return InputDecoration(labelText: label, prefixIcon: Icon(icon));
+  }
+}
+
+class _AuthBottomSwitch extends StatelessWidget {
+  const _AuthBottomSwitch({
+    required this.text,
+    required this.actionText,
+    required this.onPressed,
+  });
+
+  final String text;
+  final String actionText;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.72),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            text,
+            style: const TextStyle(
+              color: Color(0xFF64748B),
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          TextButton(
+            onPressed: onPressed,
+            child: Text(
+              actionText,
+              style: const TextStyle(fontWeight: FontWeight.w900),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WhiteCard extends StatelessWidget {
+  const _WhiteCard({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(30),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withOpacity(0.06),
+            blurRadius: 24,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: child,
+    );
+  }
+}
+
+class _MiniDarkStat extends StatelessWidget {
+  const _MiniDarkStat({required this.title, required this.subtitle});
+
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 72,
+      padding: const EdgeInsets.all(11),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(22),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF020617), Color(0xFF1E293B)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        border: Border.all(color: Colors.white24),
+      ),
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: Alignment.centerLeft,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: const TextStyle(color: Colors.white, fontSize: 21, fontWeight: FontWeight.w900)),
+            const SizedBox(height: 4),
+            Text(subtitle, style: const TextStyle(color: Color(0xFFBFDBFE), fontSize: 11, fontWeight: FontWeight.w900)),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -314,7 +506,14 @@ class _GlassBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(999),
         border: Border.all(color: Colors.white.withOpacity(0.12)),
       ),
-      child: Text(text, style: const TextStyle(color: Color(0xFFBFDBFE), fontSize: 11, fontWeight: FontWeight.w900)),
+      child: Text(
+        text,
+        style: const TextStyle(
+          color: Color(0xFFBFDBFE),
+          fontSize: 11,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
     );
   }
 }

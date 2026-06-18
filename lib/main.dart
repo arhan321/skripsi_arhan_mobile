@@ -17,7 +17,7 @@ class TourHubApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'TourHub Bali',
       theme: AppTheme.light(),
-      initialRoute: AppRoutes.authGate,
+      initialRoute: AppRoutes.landing,
       routes: AppRoutes.routes,
     );
   }
