@@ -1,7 +1,7 @@
 import 'package:dio/dio.dart';
 
-import '../../../../core/config/app_config.dart';
-import '../../../../core/storage/token_storage.dart';
+import '../../../core/config/app_config.dart';
+import '../../../core/storage/token_storage.dart';
 
 class ProfileApi {
   ProfileApi._();
@@ -19,16 +19,20 @@ class ProfileApi {
   );
 
   static Future<Map<String, dynamic>> getProfile() async {
-    final token = await TokenStorage.getToken();
+    final token = await TokenStorage.readToken();
 
-    if (token == null || token.isEmpty) {
+    if (token == null || token.trim().isEmpty) {
       throw Exception('Sesi login tidak ditemukan. Silakan login ulang.');
     }
 
     try {
       final response = await _dio.get(
         '/user/profile',
-        options: Options(headers: {'Authorization': 'Bearer $token'}),
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+          },
+        ),
       );
 
       final data = Map<String, dynamic>.from(response.data as Map);
@@ -50,9 +54,9 @@ class ProfileApi {
     String? password,
     String? passwordConfirmation,
   }) async {
-    final token = await TokenStorage.getToken();
+    final token = await TokenStorage.readToken();
 
-    if (token == null || token.isEmpty) {
+    if (token == null || token.trim().isEmpty) {
       throw Exception('Sesi login tidak ditemukan. Silakan login ulang.');
     }
 
@@ -68,10 +72,22 @@ class ProfileApi {
     }
 
     try {
+      /*
+       * Backend menyediakan:
+       * - PUT /api/user/profile
+       * - PATCH /api/user/profile
+       * - POST /api/user/profile/update
+       *
+       * POST dipakai agar aman untuk emulator/mobile/proxy.
+       */
       final response = await _dio.post(
         '/user/profile/update',
         data: payload,
-        options: Options(headers: {'Authorization': 'Bearer $token'}),
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+          },
+        ),
       );
 
       final data = Map<String, dynamic>.from(response.data as Map);
@@ -103,11 +119,18 @@ class ProfileApi {
       }
 
       final message = responseData['message'];
-      if (message != null) return message.toString();
+
+      if (message != null) {
+        return message.toString();
+      }
     }
 
     if (error.response?.statusCode == 401) {
       return 'Sesi login sudah habis. Silakan login ulang.';
+    }
+
+    if (error.response?.statusCode == 404) {
+      return 'Endpoint profile mobile belum ditemukan. Pastikan route API profile sudah dipasang.';
     }
 
     return error.message ?? 'Terjadi kesalahan koneksi.';

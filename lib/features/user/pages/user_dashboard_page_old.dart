@@ -435,12 +435,12 @@ class _HeroDashboardCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 18),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
+              Row(
                 children: [
                   const _HeroChip(text: 'Rekomendasi Pintar'),
+                  const SizedBox(width: 8),
                   const _HeroChip(text: 'Cuaca Terkini'),
+                  const SizedBox(width: 8),
                   _HeroChip(text: '$totalSearch Pencarian'),
                 ],
               ),
@@ -465,7 +465,7 @@ class _StatsGrid extends StatelessWidget {
       crossAxisSpacing: 12,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      childAspectRatio: 0.92,
+      childAspectRatio: 1.34,
       children: [
         _StatCard(
           label: 'Total Pencarian',
@@ -517,23 +517,8 @@ class _StatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    /*
-     |--------------------------------------------------------------------------
-     | Tampilan Statistik Responsive
-     |--------------------------------------------------------------------------
-     |
-     | Versi sebelumnya memakai `maxLines` + `ellipsis`, sehingga teks seperti
-     | "Jumlah pencarian wisata yang pernah..." terlihat terpotong.
-     |
-     | Versi ini dibuat lebih user friendly:
-     | - card dibuat lebih tinggi dari GridView
-     | - label dan icon berada di satu baris
-     | - deskripsi diberi ruang fleksibel
-     | - teks boleh turun baris, tidak hilang
-     |
-     */
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(26),
@@ -546,60 +531,59 @@ class _StatCard extends StatelessWidget {
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Stack(
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
+          Positioned(
+            right: 0,
+            top: 0,
+            child: Container(
+              height: 40,
+              width: 40,
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.11),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Icon(icon, color: color, size: 22),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(right: 44),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
                   label,
-                  softWrap: true,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: Color(0xFF475569),
                     fontSize: 12,
-                    height: 1.2,
-                    fontWeight: FontWeight.w900,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                height: 38,
-                width: 38,
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.11),
-                  borderRadius: BorderRadius.circular(16),
+                const SizedBox(height: 8),
+                Text(
+                  value,
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 28,
+                    fontWeight: FontWeight.w900,
+                    height: 1,
+                  ),
                 ),
-                child: Icon(icon, color: color, size: 21),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Text(
-            value,
-            style: TextStyle(
-              color: color,
-              fontSize: 30,
-              fontWeight: FontWeight.w900,
-              height: 1,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Expanded(
-            child: Align(
-              alignment: Alignment.bottomLeft,
-              child: Text(
-                subtitle,
-                softWrap: true,
-                overflow: TextOverflow.visible,
-                style: const TextStyle(
-                  color: Color(0xFF64748B),
-                  fontSize: 11,
-                  height: 1.32,
-                  fontWeight: FontWeight.w700,
+                const Spacer(),
+                Text(
+                  subtitle,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFF64748B),
+                    fontSize: 11,
+                    height: 1.25,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-              ),
+              ],
             ),
           ),
         ],
@@ -1189,23 +1173,23 @@ class _HeroChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      constraints: const BoxConstraints(maxWidth: 180),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.10),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withOpacity(0.12)),
-      ),
-      child: Text(
-        text,
-        softWrap: true,
-        overflow: TextOverflow.visible,
-        style: const TextStyle(
-          color: Color(0xFFE2E8F0),
-          fontSize: 11,
-          height: 1.2,
-          fontWeight: FontWeight.w800,
+    return Flexible(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.10),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: Colors.white.withOpacity(0.12)),
+        ),
+        child: Text(
+          text,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            color: Color(0xFFE2E8F0),
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+          ),
         ),
       ),
     );
