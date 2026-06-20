@@ -4,6 +4,120 @@ import '../../../core/routes/app_routes.dart';
 import '../../auth/data/auth_api.dart';
 import '../../recommendation/data/recommendation_history_api.dart';
 import '../../recommendation/data/recommendation_history_model.dart';
+import '../../../shared/widgets/tourhub_sidebar.dart';
+
+String _friendlyStatus(bool isSuccess) =>
+    isSuccess ? 'Berhasil' : 'Belum Berhasil';
+
+String _formatWeather(String? weather) {
+  final value = (weather ?? '-').trim();
+  if (value.isEmpty || value == '-') return '-';
+  return '${value[0].toUpperCase()}${value.substring(1)}';
+}
+
+String _visitDayLabel(dynamic value) {
+  switch ((value ?? '').toString().toLowerCase()) {
+    case 'weekday':
+      return 'Hari Biasa';
+    case 'weekend':
+      return 'Akhir Pekan';
+    default:
+      final text = (value ?? '-').toString();
+      return text.isEmpty ? '-' : text;
+  }
+}
+
+String _yesNoLabel(dynamic value) {
+  if (value == true) return 'Ya';
+  final text = (value ?? '').toString().toLowerCase();
+  if (text == '1' || text == 'true' || text == 'ya') return 'Ya';
+  return 'Tidak';
+}
+
+String _recommendationStatus(Map<String, dynamic>? item, int rank) {
+  if (rank == 1) return 'Paling Cocok';
+
+  final score = double.tryParse((item?['final_score'] ?? '0').toString()) ?? 0;
+
+  if (score >= 0.75) return 'Sangat Cocok';
+  if (score >= 0.45) return 'Cocok';
+  return 'Cukup Cocok';
+}
+
+String _suitabilityLabel(Map<String, dynamic>? item) {
+  final score = double.tryParse((item?['cbf_score'] ?? '0').toString()) ?? 0;
+
+  if (score >= 0.70) return 'Sangat Sesuai';
+  if (score >= 0.40) return 'Sesuai';
+  if (score > 0) return 'Cukup Sesuai';
+  return 'Sesuai Pilihan';
+}
+
+String _visitConditionLabel(Map<String, dynamic>? item) {
+  final value =
+      double.tryParse((item?['context_multiplier'] ?? '1').toString()) ?? 1;
+
+  if (value >= 1.08) return 'Sangat Mendukung';
+  if (value >= 1.00) return 'Mendukung';
+  if (value >= 0.90) return 'Cukup Mendukung';
+  return 'Perlu Dipertimbangkan';
+}
+
+String _friendlyReason(Map<String, dynamic>? item) {
+  var reason = (item?['alasan'] ?? '').toString().trim();
+  if (reason.isEmpty) return '';
+
+  reason = reason.replaceAll(
+    RegExp(r'\s*\(\s*CBF\s*=\s*[^\)]*\)', caseSensitive: false),
+    '',
+  );
+  reason = reason.replaceAll(
+    RegExp(r'\s*CBF\s*=\s*[0-9\.]+\s*;?', caseSensitive: false),
+    '',
+  );
+  reason = reason.replaceAll(
+    RegExp(r'\s*context\s*=\s*[0-9\.]+\s*;?', caseSensitive: false),
+    '',
+  );
+  reason = reason.replaceAll(
+    RegExp(r'\s*final score\s*[^;\.]*[;\.]?', caseSensitive: false),
+    '',
+  );
+
+  final replacements = <String, String>{
+    'cocok dengan fitur/preferensi user': 'Cocok dengan preferensi pencarianmu',
+    'fitur/preferensi user': 'preferensi pencarianmu',
+    'user': 'kamu',
+    'outdoor': 'luar ruangan',
+    'indoor': 'dalam ruangan',
+    'mixed': 'fleksibel',
+    'weekend': 'akhir pekan',
+    'weekday': 'hari biasa',
+  };
+
+  replacements.forEach((from, to) {
+    reason = reason.replaceAll(RegExp(from, caseSensitive: false), to);
+  });
+
+  reason = reason.replaceAll(RegExp(r'\s+'), ' ');
+  reason = reason.replaceAll(RegExp(r'\s*;\s*'), '; ');
+  reason = reason.replaceAll(RegExp(r';\s*;'), ';');
+  reason = reason.trim().replaceAll(RegExp(r'^[;\.\s]+|[;\.\s]+$'), '');
+
+  if (reason.isEmpty) return '';
+
+  return '${reason[0].toUpperCase()}${reason.substring(1)}.';
+}
+
+String _payloadText(
+  Map<String, dynamic> payload,
+  String key, {
+  String fallback = '-',
+}) {
+  final value = payload[key];
+  final text = (value ?? '').toString().trim();
+  return text.isEmpty ? fallback : text;
+}
 
 class UserDashboardPage extends StatefulWidget {
   const UserDashboardPage({super.key});
@@ -15,7 +129,6 @@ class UserDashboardPage extends StatefulWidget {
 class _UserDashboardPageState extends State<UserDashboardPage> {
   _DashboardData? _data;
   String? _errorMessage;
-
   bool _isLoading = true;
   bool _isRefreshing = false;
 
@@ -32,7 +145,6 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
     histories.sort((a, b) {
       final dateA = a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
       final dateB = b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-
       return dateB.compareTo(dateA);
     });
 
@@ -62,7 +174,6 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
       final message = error.toString().replaceFirst('Exception: ', '');
 
       setState(() => _errorMessage = message);
-
       _handleAuthError(message);
     } finally {
       if (mounted) {
@@ -148,18 +259,18 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF3F7FB),
+      drawer: TourHubSidebar(activeMenu: TourHubSidebarMenu.dashboard),
+      drawerEnableOpenDragGesture: true,
       appBar: AppBar(
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.white,
         titleSpacing: 0,
-        leading: IconButton(
-          tooltip: 'Beranda Awal',
-          onPressed: () => Navigator.pushNamedAndRemoveUntil(
-            context,
-            AppRoutes.landing,
-            (_) => false,
+        leading: Builder(
+          builder: (context) => IconButton(
+            tooltip: 'Menu',
+            onPressed: () => Scaffold.of(context).openDrawer(),
+            icon: const Icon(Icons.menu_rounded),
           ),
-          icon: const Icon(Icons.arrow_back_rounded),
         ),
         title: InkWell(
           onTap: () => Navigator.pushNamedAndRemoveUntil(
@@ -193,32 +304,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
             ),
           ),
         ),
-        actions: [
-          IconButton(
-            tooltip: 'Cari Wisata',
-            onPressed: () =>
-                Navigator.pushNamed(context, AppRoutes.recommendation),
-            icon: const Icon(Icons.travel_explore_rounded),
-          ),
-          IconButton(
-            tooltip: 'Riwayat',
-            onPressed: () => Navigator.pushNamed(context, AppRoutes.history),
-            icon: const Icon(Icons.history_rounded),
-          ),
-          IconButton(
-            tooltip: 'Profile',
-            onPressed: () => Navigator.pushNamed(context, AppRoutes.profile),
-            icon: const Icon(Icons.person_rounded),
-          ),
-          TextButton(
-            onPressed: _logout,
-            child: const Text(
-              'Logout',
-              style: TextStyle(fontWeight: FontWeight.w900),
-            ),
-          ),
-          const SizedBox(width: 6),
-        ],
+        actions: const [SizedBox(width: 12)],
       ),
       body: RefreshIndicator(
         onRefresh: _refreshDashboard,
@@ -274,10 +360,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
               const _TipsCard(),
               const SizedBox(height: 16),
               _HistoryPreviewSection(
-                histories:
-                    (data?.histories ?? const <RecommendationHistoryItem>[])
-                        .take(5)
-                        .toList(),
+                histories: (data?.histories ?? const []).take(5).toList(),
                 onOpenDetail: _openDetail,
               ),
               const SizedBox(height: 82),
@@ -294,43 +377,6 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
         ),
       ),
     );
-  }
-}
-
-class _DashboardData {
-  const _DashboardData({required this.user, required this.histories});
-
-  final AuthUser? user;
-  final List<RecommendationHistoryItem> histories;
-
-  int get total => histories.length;
-
-  int get successCount => histories.where((item) => item.isSuccess).length;
-
-  int get failedCount => total - successCount;
-
-  int get successRate {
-    if (total == 0) return 0;
-
-    return ((successCount / total) * 100).round();
-  }
-
-  String get userName {
-    final name = user?.name.trim();
-
-    if (name != null && name.isNotEmpty) return name;
-
-    final email = user?.email.trim();
-
-    if (email != null && email.isNotEmpty) return email.split('@').first;
-
-    return 'Wisatawan';
-  }
-
-  RecommendationHistoryItem? get latestHistory {
-    if (histories.isEmpty) return null;
-
-    return histories.first;
   }
 }
 
@@ -368,6 +414,39 @@ class _RefreshingBanner extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+class _DashboardData {
+  const _DashboardData({required this.user, required this.histories});
+
+  final dynamic user;
+  final List<RecommendationHistoryItem> histories;
+
+  int get total => histories.length;
+
+  int get successCount => histories.where((item) => item.isSuccess).length;
+
+  int get failedCount => total - successCount;
+
+  int get successRate {
+    if (total == 0) return 0;
+    return ((successCount / total) * 100).round();
+  }
+
+  String get userName {
+    final name = user?.name?.toString().trim();
+    if (name != null && name.isNotEmpty) return name;
+
+    final email = user?.email?.toString().trim();
+    if (email != null && email.isNotEmpty) return email.split('@').first;
+
+    return 'Wisatawan';
+  }
+
+  RecommendationHistoryItem? get latestHistory {
+    if (histories.isEmpty) return null;
+    return histories.first;
   }
 }
 
@@ -413,7 +492,7 @@ class _HeroDashboardCard extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const _GlassBadge(text: 'Beranda Wisata TourHub Bali'),
+              const _GlassBadge(text: 'Beranda TourHub Bali'),
               const SizedBox(height: 16),
               Text(
                 'Halo, $userName',
@@ -426,7 +505,7 @@ class _HeroDashboardCard extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               const Text(
-                'Di sini kamu bisa melihat ringkasan pencarian wisata, rekomendasi terakhir, dan riwayat destinasi yang pernah kamu cari.',
+                'Di sini kamu bisa melihat rekomendasi terakhir, tips pencarian, dan riwayat wisata yang pernah kamu cari.',
                 style: TextStyle(
                   color: Color(0xFFE2E8F0),
                   height: 1.5,
@@ -440,7 +519,7 @@ class _HeroDashboardCard extends StatelessWidget {
                 runSpacing: 8,
                 children: [
                   const _HeroChip(text: 'Rekomendasi Pintar'),
-                  const _HeroChip(text: 'Cuaca Terkini'),
+                  const _HeroChip(text: 'Cuaca Otomatis'),
                   _HeroChip(text: '$totalSearch Pencarian'),
                 ],
               ),
@@ -465,33 +544,33 @@ class _StatsGrid extends StatelessWidget {
       crossAxisSpacing: 12,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      childAspectRatio: 0.92,
+      childAspectRatio: 1.08,
       children: [
         _StatCard(
           label: 'Total Pencarian',
           value: data.total.toString(),
-          subtitle: 'Jumlah pencarian wisata yang pernah kamu lakukan.',
+          subtitle: 'Jumlah pencarian wisata kamu.',
           icon: Icons.push_pin_rounded,
           color: const Color(0xFF2563EB),
         ),
         _StatCard(
           label: 'Berhasil',
           value: data.successCount.toString(),
-          subtitle: 'Pencarian berhasil menampilkan rekomendasi.',
+          subtitle: 'Pencarian yang menemukan hasil.',
           icon: Icons.check_circle_rounded,
           color: const Color(0xFF059669),
         ),
         _StatCard(
           label: 'Belum Berhasil',
           value: data.failedCount.toString(),
-          subtitle: 'Pencarian yang belum mendapatkan hasil.',
+          subtitle: 'Pencarian yang perlu dicoba ulang.',
           icon: Icons.warning_rounded,
-          color: const Color(0xFFDC2626),
+          color: const Color(0xFFF59E0B),
         ),
         _StatCard(
           label: 'Hasil Tersedia',
           value: '${data.successRate}%',
-          subtitle: 'Pencarian yang berhasil menampilkan pilihan wisata.',
+          subtitle: 'Pencarian yang berhasil memberi pilihan.',
           icon: Icons.trending_up_rounded,
           color: const Color(0xFF1D4ED8),
         ),
@@ -517,23 +596,8 @@ class _StatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    /*
-     |--------------------------------------------------------------------------
-     | Tampilan Statistik Responsive
-     |--------------------------------------------------------------------------
-     |
-     | Versi sebelumnya memakai `maxLines` + `ellipsis`, sehingga teks seperti
-     | "Jumlah pencarian wisata yang pernah..." terlihat terpotong.
-     |
-     | Versi ini dibuat lebih user friendly:
-     | - card dibuat lebih tinggi dari GridView
-     | - label dan icon berada di satu baris
-     | - deskripsi diberi ruang fleksibel
-     | - teks boleh turun baris, tidak hilang
-     |
-     */
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(26),
@@ -546,60 +610,58 @@ class _StatCard extends StatelessWidget {
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Stack(
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
+          Positioned(
+            right: 0,
+            top: 0,
+            child: Container(
+              height: 40,
+              width: 40,
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.11),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Icon(icon, color: color, size: 22),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(right: 44),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
                   label,
                   softWrap: true,
                   style: const TextStyle(
                     color: Color(0xFF475569),
                     fontSize: 12,
                     height: 1.2,
-                    fontWeight: FontWeight.w900,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                height: 38,
-                width: 38,
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.11),
-                  borderRadius: BorderRadius.circular(16),
+                const SizedBox(height: 8),
+                Text(
+                  value,
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 28,
+                    fontWeight: FontWeight.w900,
+                    height: 1,
+                  ),
                 ),
-                child: Icon(icon, color: color, size: 21),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Text(
-            value,
-            style: TextStyle(
-              color: color,
-              fontSize: 30,
-              fontWeight: FontWeight.w900,
-              height: 1,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Expanded(
-            child: Align(
-              alignment: Alignment.bottomLeft,
-              child: Text(
-                subtitle,
-                softWrap: true,
-                overflow: TextOverflow.visible,
-                style: const TextStyle(
-                  color: Color(0xFF64748B),
-                  fontSize: 11,
-                  height: 1.32,
-                  fontWeight: FontWeight.w700,
+                const Spacer(),
+                Text(
+                  subtitle,
+                  softWrap: true,
+                  style: const TextStyle(
+                    color: Color(0xFF64748B),
+                    fontSize: 11,
+                    height: 1.28,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-              ),
+              ],
             ),
           ),
         ],
@@ -619,10 +681,9 @@ class _LatestRecommendationCard extends StatelessWidget {
     final top = item.topRecommendation;
     final imageUrl = top?['link_gambar']?.toString();
     final destinationName = item.topDestinationName;
-    final weather = item.weatherUsed ?? '-';
-    final options = item.totalCandidates?.toString() ?? '-';
+    final weather = _formatWeather(item.weatherUsed);
+    final choices = item.totalCandidates?.toString() ?? '-';
     final category = item.categoriesLabel;
-    final weatherInfo = item.weatherSource ?? 'Cuaca otomatis';
 
     return Container(
       decoration: BoxDecoration(
@@ -651,13 +712,6 @@ class _LatestRecommendationCard extends StatelessWidget {
                     Image.network(
                       imageUrl,
                       fit: BoxFit.cover,
-                      cacheWidth: 900,
-                      filterQuality: FilterQuality.low,
-                      loadingBuilder: (context, child, loadingProgress) {
-                        if (loadingProgress == null) return child;
-
-                        return const _ImageFallback();
-                      },
                       errorBuilder: (_, __, ___) => const _ImageFallback(),
                     )
                   else
@@ -744,7 +798,7 @@ class _LatestRecommendationCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 10),
                     Expanded(
-                      child: _SmallInfoBox(label: 'Pilihan', value: options),
+                      child: _SmallInfoBox(label: 'Pilihan', value: choices),
                     ),
                   ],
                 ),
@@ -752,10 +806,10 @@ class _LatestRecommendationCard extends StatelessWidget {
                 Row(
                   children: [
                     _Pill(
-                      text: item.isSuccess ? 'Berhasil' : 'Belum Berhasil',
+                      text: _friendlyStatus(item.isSuccess),
                       color: item.isSuccess
                           ? const Color(0xFF059669)
-                          : const Color(0xFFDC2626),
+                          : const Color(0xFFF59E0B),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
@@ -776,7 +830,7 @@ class _LatestRecommendationCard extends StatelessWidget {
                     border: Border.all(color: const Color(0xFFA7F3D0)),
                   ),
                   child: Text(
-                    'Info cuaca: $weatherInfo • ${item.displayDate}',
+                    'Info cuaca: $weather • pencarian pada ${item.displayDate}',
                     style: const TextStyle(
                       color: Color(0xFF047857),
                       height: 1.35,
@@ -787,58 +841,6 @@ class _LatestRecommendationCard extends StatelessWidget {
                 ),
               ],
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _NoLatestCard extends StatelessWidget {
-  const _NoLatestCard();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: Column(
-        children: [
-          const Icon(
-            Icons.travel_explore_rounded,
-            color: Color(0xFF2563EB),
-            size: 42,
-          ),
-          const SizedBox(height: 12),
-          const Text(
-            'Belum ada pencarian terakhir',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Color(0xFF020617),
-              fontSize: 20,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: 6),
-          const Text(
-            'Cari destinasi wisata dulu agar beranda kamu terisi.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Color(0xFF64748B),
-              height: 1.45,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 16),
-          ElevatedButton.icon(
-            onPressed: () =>
-                Navigator.pushNamed(context, AppRoutes.recommendation),
-            icon: const Icon(Icons.search_rounded),
-            label: const Text('Cari Wisata'),
           ),
         ],
       ),
@@ -982,7 +984,7 @@ class _HistoryPreviewSection extends StatelessWidget {
             const Padding(
               padding: EdgeInsets.only(bottom: 12),
               child: Text(
-                'Belum ada riwayat pencarian.',
+                'Belum ada riwayat.',
                 style: TextStyle(
                   color: Color(0xFF64748B),
                   fontWeight: FontWeight.w700,
@@ -1010,7 +1012,7 @@ class _HistoryRow extends StatelessWidget {
     final topName = item.topDestinationName;
     final statusColor = item.isSuccess
         ? const Color(0xFF059669)
-        : const Color(0xFFDC2626);
+        : const Color(0xFFF59E0B);
 
     return InkWell(
       onTap: onTap,
@@ -1036,7 +1038,7 @@ class _HistoryRow extends StatelessWidget {
                 child: Icon(
                   item.isSuccess
                       ? Icons.check_circle_rounded
-                      : Icons.warning_rounded,
+                      : Icons.info_rounded,
                   color: statusColor,
                   size: 22,
                 ),
@@ -1057,7 +1059,7 @@ class _HistoryRow extends StatelessWidget {
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      '${item.weatherUsed ?? '-'} • ${item.displayDate}',
+                      '${_formatWeather(item.weatherUsed)} • ${item.displayDate}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
@@ -1073,6 +1075,58 @@ class _HistoryRow extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _NoLatestCard extends StatelessWidget {
+  const _NoLatestCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        children: [
+          const Icon(
+            Icons.travel_explore_rounded,
+            color: Color(0xFF2563EB),
+            size: 42,
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'Belum ada rekomendasi terakhir',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Color(0xFF020617),
+              fontSize: 20,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Mulai cari rekomendasi wisata agar dashboard kamu terisi.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Color(0xFF64748B),
+              height: 1.45,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton.icon(
+            onPressed: () =>
+                Navigator.pushNamed(context, AppRoutes.recommendation),
+            icon: const Icon(Icons.search_rounded),
+            label: const Text('Cari Rekomendasi'),
+          ),
+        ],
       ),
     );
   }
@@ -1190,7 +1244,6 @@ class _HeroChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      constraints: const BoxConstraints(maxWidth: 180),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.10),
@@ -1199,12 +1252,11 @@ class _HeroChip extends StatelessWidget {
       ),
       child: Text(
         text,
-        softWrap: true,
-        overflow: TextOverflow.visible,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
         style: const TextStyle(
           color: Color(0xFFE2E8F0),
           fontSize: 11,
-          height: 1.2,
           fontWeight: FontWeight.w800,
         ),
       ),
@@ -1226,6 +1278,31 @@ class _ImageFallback extends StatelessWidget {
           size: 38,
         ),
       ),
+    );
+  }
+}
+
+class _LoadingDashboard extends StatelessWidget {
+  const _LoadingDashboard();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.all(18),
+      children: const [
+        SizedBox(height: 180),
+        Center(child: CircularProgressIndicator()),
+        SizedBox(height: 16),
+        Center(
+          child: Text(
+            'Memuat dashboard...',
+            style: TextStyle(
+              color: Color(0xFF64748B),
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

@@ -6,6 +6,7 @@ import '../../../core/utils/maps_launcher.dart';
 import '../../auth/data/auth_api.dart';
 import '../data/recommendation_api.dart';
 import '../data/tourhub_location.dart';
+import '../../../shared/widgets/tourhub_sidebar.dart';
 
 class RecommendationPage extends StatefulWidget {
   const RecommendationPage({super.key});
@@ -16,19 +17,14 @@ class RecommendationPage extends StatefulWidget {
 
 class _RecommendationPageState extends State<RecommendationPage> {
   final _keywordController = TextEditingController();
+
   final Set<String> _selectedCategories = {'Alam'};
 
   TourHubLocation _selectedLocation = tourHubLocations.first;
 
   /*
-   |--------------------------------------------------------------------------
-   | Cuaca otomatis seperti website
-   |--------------------------------------------------------------------------
-   |
-   | Website sudah dibuat tidak memakai pilihan cuaca manual.
-   | Cuaca default tetap "cerah" sebagai fallback, sedangkan BMKG selalu aktif.
-   | Laravel/FastAPI akan memakai bmkg_adm4 dari lokasi jika tersedia.
-   |
+   * Cuaca dibuat otomatis seperti website.
+   * User tidak perlu melihat kode wilayah, fallback, atau istilah teknis lain.
    */
   static const String _defaultWeatherFallback = 'cerah';
   static const bool _alwaysUseBmkg = true;
@@ -59,7 +55,7 @@ class _RecommendationPageState extends State<RecommendationPage> {
 
   Future<void> _submit() async {
     if (_selectedCategories.isEmpty) {
-      _showSnack('Pilih minimal 1 kategori.');
+      _showSnack('Pilih minimal 1 kategori wisata.');
       return;
     }
 
@@ -74,12 +70,8 @@ class _RecommendationPageState extends State<RecommendationPage> {
         keywords: _keywordController.text,
         minRating: _minRating,
         topN: _topN,
-
-        // Sama seperti website:
-        // weather hanya fallback, BMKG selalu aktif.
         weather: _defaultWeatherFallback,
         useBmkg: _alwaysUseBmkg,
-
         visitDay: _visitDay,
         isHighSeason: _isHighSeason,
       );
@@ -88,7 +80,7 @@ class _RecommendationPageState extends State<RecommendationPage> {
 
       setState(() => _result = Map<String, dynamic>.from(response));
 
-      _showSnack('Rekomendasi berhasil dihitung dengan cuaca otomatis BMKG.');
+      _showSnack('Rekomendasi wisata berhasil ditemukan.');
     } catch (error) {
       final message = error.toString().replaceFirst('Exception: ', '');
 
@@ -129,17 +121,27 @@ class _RecommendationPageState extends State<RecommendationPage> {
     final dataMap = data is Map
         ? Map<String, dynamic>.from(data)
         : <String, dynamic>{};
+
     final recommendations = ((dataMap['recommendations'] ?? []) as List?) ?? [];
+
     final weatherUsed = dataMap['weather_used']?.toString() ?? '-';
     final totalCandidates = dataMap['total_candidates']?.toString() ?? '-';
-    final responseTime = (_result?['response_time_ms'] ?? '-').toString();
 
     return Scaffold(
       backgroundColor: const Color(0xFFF3F7FB),
+      drawer: TourHubSidebar(activeMenu: TourHubSidebarMenu.recommendation),
+      drawerEnableOpenDragGesture: true,
       appBar: AppBar(
-        titleSpacing: 20,
+        titleSpacing: 0,
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.white,
+        leading: Builder(
+          builder: (context) => IconButton(
+            tooltip: 'Menu',
+            onPressed: () => Scaffold.of(context).openDrawer(),
+            icon: const Icon(Icons.menu_rounded),
+          ),
+        ),
         title: InkWell(
           onTap: () => Navigator.pushNamedAndRemoveUntil(
             context,
@@ -161,7 +163,7 @@ class _RecommendationPageState extends State<RecommendationPage> {
                   ),
                 ),
                 Text(
-                  'Rekomendasi CBF + CARS',
+                  'Rekomendasi Wisata Bali',
                   style: TextStyle(
                     fontSize: 11,
                     color: Color(0xFF64748B),
@@ -172,26 +174,7 @@ class _RecommendationPageState extends State<RecommendationPage> {
             ),
           ),
         ),
-        actions: [
-          IconButton(
-            tooltip: 'Dashboard',
-            onPressed: () => Navigator.pushNamed(context, AppRoutes.dashboard),
-            icon: const Icon(Icons.dashboard_rounded),
-          ),
-          IconButton(
-            tooltip: 'Riwayat',
-            onPressed: () => Navigator.pushNamed(context, AppRoutes.history),
-            icon: const Icon(Icons.history_rounded),
-          ),
-          TextButton(
-            onPressed: _logout,
-            child: const Text(
-              'Logout',
-              style: TextStyle(fontWeight: FontWeight.w800),
-            ),
-          ),
-          const SizedBox(width: 6),
-        ],
+        actions: const [SizedBox(width: 12)],
       ),
       body: RefreshIndicator(
         onRefresh: () async {
@@ -239,9 +222,8 @@ class _RecommendationPageState extends State<RecommendationPage> {
             if (_result != null) ...[
               const SizedBox(height: 16),
               _ResultSummary(
-                weatherUsed: weatherUsed,
+                weatherUsed: _formatWeather(weatherUsed),
                 totalCandidates: totalCandidates,
-                responseTimeMs: responseTime,
                 totalOutput: recommendations.length,
               ),
               const SizedBox(height: 16),
@@ -274,6 +256,104 @@ class _RecommendationPageState extends State<RecommendationPage> {
   }
 }
 
+String _formatWeather(String weather) {
+  final value = weather.trim();
+
+  if (value.isEmpty || value == '-') return '-';
+
+  return '${value[0].toUpperCase()}${value.substring(1)}';
+}
+
+String _recommendationStatus(Map<String, dynamic> item, int rank) {
+  if (rank == 1) return 'Paling Cocok';
+
+  final score = double.tryParse((item['final_score'] ?? '0').toString()) ?? 0;
+
+  if (score >= 0.75) return 'Sangat Cocok';
+  if (score >= 0.45) return 'Cocok';
+
+  return 'Cukup Cocok';
+}
+
+String _suitabilityLabel(Map<String, dynamic> item) {
+  final score = double.tryParse((item['cbf_score'] ?? '0').toString()) ?? 0;
+
+  if (score >= 0.70) return 'Sangat Sesuai';
+  if (score >= 0.40) return 'Sesuai';
+  if (score > 0) return 'Cukup Sesuai';
+
+  return 'Sesuai Pilihan';
+}
+
+String _visitConditionLabel(Map<String, dynamic> item) {
+  final value =
+      double.tryParse((item['context_multiplier'] ?? '1').toString()) ?? 1;
+
+  if (value >= 1.08) return 'Sangat Mendukung';
+  if (value >= 1.00) return 'Mendukung';
+  if (value >= 0.90) return 'Cukup Mendukung';
+
+  return 'Perlu Dipertimbangkan';
+}
+
+String _visitDayLabel(String value) {
+  switch (value.toLowerCase()) {
+    case 'weekday':
+      return 'Hari Biasa';
+    case 'weekend':
+      return 'Akhir Pekan';
+    default:
+      return value;
+  }
+}
+
+String _friendlyReason(Map<String, dynamic> item) {
+  var reason = (item['alasan'] ?? '').toString().trim();
+
+  if (reason.isEmpty) return '';
+
+  reason = reason.replaceAll(
+    RegExp(r'\s*\(\s*CBF\s*=\s*[^\)]*\)', caseSensitive: false),
+    '',
+  );
+  reason = reason.replaceAll(
+    RegExp(r'\s*CBF\s*=\s*[0-9\.]+\s*;?', caseSensitive: false),
+    '',
+  );
+  reason = reason.replaceAll(
+    RegExp(r'\s*context\s*=\s*[0-9\.]+\s*;?', caseSensitive: false),
+    '',
+  );
+  reason = reason.replaceAll(
+    RegExp(r'\s*final score\s*[^;\.]*[;\.]?', caseSensitive: false),
+    '',
+  );
+
+  final replacements = <String, String>{
+    'cocok dengan fitur/preferensi user': 'Cocok dengan preferensi pencarianmu',
+    'fitur/preferensi user': 'preferensi pencarianmu',
+    'user': 'kamu',
+    'outdoor': 'luar ruangan',
+    'indoor': 'dalam ruangan',
+    'mixed': 'fleksibel',
+    'weekend': 'akhir pekan',
+    'weekday': 'hari biasa',
+  };
+
+  replacements.forEach((from, to) {
+    reason = reason.replaceAll(RegExp(from, caseSensitive: false), to);
+  });
+
+  reason = reason.replaceAll(RegExp(r'\s+'), ' ');
+  reason = reason.replaceAll(RegExp(r'\s*;\s*'), '; ');
+  reason = reason.replaceAll(RegExp(r';\s*;'), ';');
+  reason = reason.trim().replaceAll(RegExp(r'^[;\.\s]+|[;\.\s]+$'), '');
+
+  if (reason.isEmpty) return '';
+
+  return '${reason[0].toUpperCase()}${reason.substring(1)}.';
+}
+
 class _HeroCard extends StatelessWidget {
   const _HeroCard();
 
@@ -299,7 +379,7 @@ class _HeroCard extends StatelessWidget {
       child: const Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _GlassBadge(text: 'CBF + CARS • Cuaca Otomatis BMKG'),
+          _GlassBadge(text: 'Rekomendasi Pintar • Cuaca Otomatis'),
           SizedBox(height: 16),
           Text(
             'Mau liburan ke mana?',
@@ -312,7 +392,7 @@ class _HeroCard extends StatelessWidget {
           ),
           SizedBox(height: 10),
           Text(
-            'Pilih preferensi wisata, lalu sistem akan menyesuaikan ranking destinasi dengan lokasi dan prakiraan cuaca otomatis.',
+            'Pilih preferensi wisata, lalu TourHub akan mencarikan destinasi yang paling cocok untuk perjalananmu.',
             style: TextStyle(
               color: Color(0xFFE2E8F0),
               height: 1.5,
@@ -381,7 +461,7 @@ class _FormCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'TRAVEL PLANNER',
+            'RENCANA WISATA',
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w900,
@@ -400,7 +480,7 @@ class _FormCard extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           const Text(
-            'Cuaca sudah otomatis mengikuti BMKG seperti website. User cukup mengatur preferensi liburan.',
+            'Cuaca otomatis menyesuaikan lokasi wisata pilihanmu. Kamu cukup mengatur preferensi liburan.',
             style: TextStyle(
               color: Color(0xFF64748B),
               fontWeight: FontWeight.w600,
@@ -408,7 +488,6 @@ class _FormCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 18),
-
           const Text(
             'Kategori Preferensi',
             style: TextStyle(fontWeight: FontWeight.w900),
@@ -440,7 +519,6 @@ class _FormCard extends StatelessWidget {
               );
             }).toList(),
           ),
-
           const SizedBox(height: 16),
           DropdownButtonFormField<TourHubLocation>(
             value: selectedLocation,
@@ -461,28 +539,26 @@ class _FormCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           const Text(
-            'Lokasi sudah dipasangkan manual agar kecamatan sesuai kabupaten.',
+            'Pilih daerah wisata yang ingin kamu jelajahi.',
             style: TextStyle(
               fontSize: 12,
               color: Color(0xFF64748B),
               fontWeight: FontWeight.w600,
             ),
           ),
-
           const SizedBox(height: 14),
           TextField(
             controller: keywordController,
             decoration: _inputDecoration(
-              label: 'Keywords',
+              label: 'Kata Kunci',
             ).copyWith(hintText: 'Contoh: pantai, sunset'),
           ),
-
           const SizedBox(height: 14),
           Row(
             children: [
               Expanded(
                 child: _StepperBox(
-                  label: 'Min Rating',
+                  label: 'Rating Minimal',
                   value: minRating.toStringAsFixed(1),
                   onMinus: () => onMinRatingChanged(
                     ((minRating - 0.1).clamp(0.0, 5.0)).toDouble(),
@@ -495,7 +571,7 @@ class _FormCard extends StatelessWidget {
               const SizedBox(width: 10),
               Expanded(
                 child: _StepperBox(
-                  label: 'Top N',
+                  label: 'Jumlah Pilihan',
                   value: topN.toString(),
                   onMinus: () =>
                       onTopNChanged(((topN - 1).clamp(1, 50)).toInt()),
@@ -505,48 +581,30 @@ class _FormCard extends StatelessWidget {
               ),
             ],
           ),
-
           const SizedBox(height: 12),
-
-          /*
-           |--------------------------------------------------------------------------
-           | CODE MATI - Cuaca manual lama
-           |--------------------------------------------------------------------------
-           | Bagian ini sebelumnya menampilkan dropdown Cuaca Manual:
-           |
-           | DropdownButtonFormField(
-           |   value: weather,
-           |   decoration: _inputDecoration(label: 'Cuaca Manual'),
-           |   items: const ['cerah', 'hujan', 'mendung', 'berawan', 'unknown']...
-           | )
-           |
-           | Sekarang tidak dipakai karena mobile mengikuti website:
-           | cuaca default "cerah" sebagai fallback dan BMKG otomatis aktif.
-           |
-           */
           _AutoWeatherCard(location: selectedLocation),
-
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(
             value: visitDay,
             decoration: _inputDecoration(label: 'Hari Kunjungan'),
             items: const ['weekday', 'weekend']
                 .map(
-                  (item) =>
-                      DropdownMenuItem<String>(value: item, child: Text(item)),
+                  (item) => DropdownMenuItem<String>(
+                    value: item,
+                    child: Text(_visitDayLabel(item)),
+                  ),
                 )
                 .toList(),
             onChanged: onVisitDayChanged,
           ),
-
           const SizedBox(height: 16),
           _SwitchRow(
-            title: 'High Season',
-            subtitle: 'Simulasi kondisi ramai wisatawan.',
+            title: 'Musim Ramai',
+            subtitle:
+                'Aktifkan jika kamu berkunjung saat liburan atau kondisi ramai wisatawan.',
             value: isHighSeason,
             onChanged: onHighSeasonChanged,
           ),
-
           const SizedBox(height: 16),
           SizedBox(
             width: double.infinity,
@@ -564,7 +622,9 @@ class _FormCard extends StatelessWidget {
                     )
                   : const Icon(Icons.search_rounded),
               label: Text(
-                isLoading ? 'Menghitung...' : 'Cari Rekomendasi Wisata',
+                isLoading
+                    ? 'Mencari rekomendasi...'
+                    : 'Cari Rekomendasi Wisata',
               ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF020617),
@@ -619,7 +679,7 @@ class _AutoWeatherCard extends StatelessWidget {
               border: Border.all(color: Colors.white.withOpacity(0.14)),
             ),
             child: const Center(
-              child: Text('🌦️', style: TextStyle(fontSize: 22)),
+              child: Text('🌤️', style: TextStyle(fontSize: 22)),
             ),
           ),
           const SizedBox(width: 14),
@@ -628,7 +688,7 @@ class _AutoWeatherCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'Cuaca Otomatis BMKG',
+                  'Cuaca Otomatis',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 16,
@@ -637,7 +697,7 @@ class _AutoWeatherCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'ADM4 ${location.bmkgAdm4} • fallback cerah',
+                  '${location.kabupatenKota} • ${location.kecamatan}',
                   style: const TextStyle(
                     color: Color(0xFFBFDBFE),
                     fontSize: 12,
@@ -647,7 +707,7 @@ class _AutoWeatherCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 const Text(
-                  'Sistem akan menyesuaikan rekomendasi dengan prakiraan cuaca lokasi yang dipilih.',
+                  'TourHub membantu memilih destinasi yang lebih nyaman sesuai kondisi cuaca lokasi pilihanmu.',
                   style: TextStyle(
                     color: Color(0xFFE2E8F0),
                     fontSize: 11,
@@ -718,6 +778,7 @@ class _StepperBox extends StatelessWidget {
             children: [
               InkWell(
                 onTap: onMinus,
+                borderRadius: BorderRadius.circular(999),
                 child: const Icon(Icons.remove_circle_outline_rounded),
               ),
               Expanded(
@@ -732,6 +793,7 @@ class _StepperBox extends StatelessWidget {
               ),
               InkWell(
                 onTap: onPlus,
+                borderRadius: BorderRadius.circular(999),
                 child: const Icon(Icons.add_circle_outline_rounded),
               ),
             ],
@@ -796,13 +858,11 @@ class _ResultSummary extends StatelessWidget {
   const _ResultSummary({
     required this.weatherUsed,
     required this.totalCandidates,
-    required this.responseTimeMs,
     required this.totalOutput,
   });
 
   final String weatherUsed;
   final String totalCandidates;
-  final String responseTimeMs;
   final int totalOutput;
 
   @override
@@ -819,9 +879,8 @@ class _ResultSummary extends StatelessWidget {
         runSpacing: 10,
         children: [
           _SummaryPill(label: 'Cuaca', value: weatherUsed),
-          _SummaryPill(label: 'Candidates', value: totalCandidates),
-          _SummaryPill(label: 'Output', value: totalOutput.toString()),
-          _SummaryPill(label: 'Response', value: '$responseTimeMs ms'),
+          _SummaryPill(label: 'Pilihan Ditemukan', value: totalCandidates),
+          _SummaryPill(label: 'Ditampilkan', value: totalOutput.toString()),
         ],
       ),
     );
@@ -868,11 +927,11 @@ class _SectionTitle extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Semua Kandidat Rekomendasi',
+                'Semua Pilihan Wisata',
                 style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
               ),
               Text(
-                'Diurutkan dari final score tertinggi.',
+                'Destinasi paling atas adalah pilihan yang paling cocok untukmu.',
                 style: TextStyle(
                   color: Color(0xFF64748B),
                   fontSize: 12,
@@ -912,6 +971,7 @@ class _RecommendationItemCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final imageUrl = item['link_gambar']?.toString();
     final mapsUrl = item['link_google_maps']?.toString();
+    final reason = _friendlyReason(item);
 
     return Container(
       decoration: BoxDecoration(
@@ -1014,8 +1074,9 @@ class _RecommendationItemCard extends StatelessWidget {
                           ),
                         ),
                         Container(
+                          constraints: const BoxConstraints(maxWidth: 118),
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
+                            horizontal: 13,
                             vertical: 10,
                           ),
                           decoration: BoxDecoration(
@@ -1025,7 +1086,7 @@ class _RecommendationItemCard extends StatelessWidget {
                           child: Column(
                             children: [
                               const Text(
-                                'Score',
+                                'Status',
                                 style: TextStyle(
                                   color: Color(0xFF64748B),
                                   fontSize: 11,
@@ -1033,10 +1094,12 @@ class _RecommendationItemCard extends StatelessWidget {
                                 ),
                               ),
                               Text(
-                                (item['final_score'] ?? '-').toString(),
+                                _recommendationStatus(item, rank),
+                                textAlign: TextAlign.center,
                                 style: const TextStyle(
                                   color: Color(0xFF020617),
-                                  fontSize: 18,
+                                  fontSize: 14,
+                                  height: 1.1,
                                   fontWeight: FontWeight.w900,
                                 ),
                               ),
@@ -1088,20 +1151,20 @@ class _RecommendationItemCard extends StatelessWidget {
                   children: [
                     Expanded(
                       child: _MetricBox(
-                        label: 'CBF',
-                        value: (item['cbf_score'] ?? '-').toString(),
+                        label: 'Kesesuaian',
+                        value: _suitabilityLabel(item),
                       ),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
                       child: _MetricBox(
-                        label: 'Context',
-                        value: (item['context_multiplier'] ?? '-').toString(),
+                        label: 'Kondisi Kunjungan',
+                        value: _visitConditionLabel(item),
                       ),
                     ),
                   ],
                 ),
-                if ((item['alasan'] ?? '').toString().isNotEmpty) ...[
+                if (reason.isNotEmpty) ...[
                   const SizedBox(height: 12),
                   Container(
                     padding: const EdgeInsets.all(14),
@@ -1111,7 +1174,7 @@ class _RecommendationItemCard extends StatelessWidget {
                       border: Border.all(color: const Color(0xFFE2E8F0)),
                     ),
                     child: Text(
-                      (item['alasan'] ?? '').toString(),
+                      reason,
                       style: const TextStyle(
                         color: Color(0xFF475569),
                         height: 1.5,
@@ -1314,7 +1377,7 @@ class _EmptyResultCard extends StatelessWidget {
       border: Border.all(color: const Color(0xFFE2E8F0)),
     ),
     child: const Text(
-      'Tidak ada rekomendasi.\nCoba turunkan min rating atau pilih kategori lain.',
+      'Belum ada pilihan wisata yang cocok.\nCoba turunkan rating minimal atau pilih kategori lain.',
       textAlign: TextAlign.center,
       style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w700),
     ),
