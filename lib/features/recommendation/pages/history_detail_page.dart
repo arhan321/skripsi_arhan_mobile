@@ -4,6 +4,143 @@ import '../../../core/utils/maps_launcher.dart';
 import '../data/recommendation_history_api.dart';
 import '../data/recommendation_history_model.dart';
 
+String _friendlyStatus(bool isSuccess) {
+  return isSuccess ? 'Berhasil' : 'Belum Berhasil';
+}
+
+String _formatWeather(dynamic weather) {
+  final value = (weather ?? '-').toString().trim();
+
+  if (value.isEmpty || value == '-') return '-';
+
+  return '${value[0].toUpperCase()}${value.substring(1)}';
+}
+
+String _recommendationStatus(Map? item, int rank) {
+  if (rank == 1) return 'Paling Cocok';
+
+  final score = double.tryParse((item?['final_score'] ?? '0').toString()) ?? 0;
+
+  if (score >= 0.75) return 'Sangat Cocok';
+  if (score >= 0.45) return 'Cocok';
+
+  return 'Cukup Cocok';
+}
+
+String _suitabilityLabel(Map item) {
+  final score = double.tryParse((item['cbf_score'] ?? '0').toString()) ?? 0;
+
+  if (score >= 0.70) return 'Sangat Sesuai';
+  if (score >= 0.40) return 'Sesuai';
+  if (score > 0) return 'Cukup Sesuai';
+
+  return 'Sesuai Pilihan';
+}
+
+String _visitConditionLabel(Map? item) {
+  final value =
+      double.tryParse((item?['context_multiplier'] ?? '1').toString()) ?? 1;
+
+  if (value >= 1.08) return 'Sangat Mendukung';
+  if (value >= 1.00) return 'Mendukung';
+  if (value >= 0.90) return 'Cukup Mendukung';
+
+  return 'Perlu Dipertimbangkan';
+}
+
+String _visitDayLabel(dynamic value) {
+  switch ((value ?? '').toString().toLowerCase()) {
+    case 'weekday':
+      return 'Hari Biasa';
+    case 'weekend':
+      return 'Akhir Pekan';
+    default:
+      final text = (value ?? '-').toString().trim();
+      return text.isEmpty ? '-' : text;
+  }
+}
+
+String _yesNoLabel(dynamic value) {
+  if (value == true) return 'Ya';
+
+  final text = (value ?? '').toString().toLowerCase();
+
+  if (text == '1' || text == 'true' || text == 'ya') return 'Ya';
+
+  return 'Tidak';
+}
+
+String _friendlyReason(Map item) {
+  var reason = (item['alasan'] ?? '').toString().trim();
+
+  if (reason.isEmpty) return '';
+
+  reason = reason.replaceAll(
+    RegExp(r'\s*\(\s*CBF\s*=\s*[^\)]*\)', caseSensitive: false),
+    '',
+  );
+  reason = reason.replaceAll(
+    RegExp(r'\s*CBF\s*=\s*[0-9\.]+\s*;?', caseSensitive: false),
+    '',
+  );
+  reason = reason.replaceAll(
+    RegExp(r'\s*context\s*=\s*[0-9\.]+\s*;?', caseSensitive: false),
+    '',
+  );
+  reason = reason.replaceAll(
+    RegExp(r'\s*final score\s*[^;\.]*[;\.]?', caseSensitive: false),
+    '',
+  );
+
+  final replacements = <String, String>{
+    'cocok dengan fitur/preferensi user': 'Cocok dengan preferensi pencarianmu',
+    'fitur/preferensi user': 'preferensi pencarianmu',
+    'user': 'kamu',
+    'outdoor': 'luar ruangan',
+    'indoor': 'dalam ruangan',
+    'mixed': 'fleksibel',
+    'weekend': 'akhir pekan',
+    'weekday': 'hari biasa',
+  };
+
+  replacements.forEach((from, to) {
+    reason = reason.replaceAll(RegExp(from, caseSensitive: false), to);
+  });
+
+  reason = reason.replaceAll(RegExp(r'\s+'), ' ');
+  reason = reason.replaceAll(RegExp(r'\s*;\s*'), '; ');
+  reason = reason.replaceAll(RegExp(r';\s*;'), ';');
+  reason = reason.trim().replaceAll(RegExp(r'^[;\.\s]+|[;\.\s]+$'), '');
+
+  if (reason.isEmpty) return '';
+
+  return '${reason[0].toUpperCase()}${reason.substring(1)}.';
+}
+
+String _payloadText(Map payload, String key, {String fallback = '-'}) {
+  final value = payload[key];
+  final text = (value ?? '').toString().trim();
+
+  return text.isEmpty ? fallback : text;
+}
+
+String _keywordText(Map payload) {
+  final keywords = payload['keywords'];
+
+  if (keywords is List) {
+    final text = keywords
+        .map((item) => item.toString().trim())
+        .where((item) => item.isNotEmpty)
+        .join(', ');
+
+    return text.isEmpty ? '-' : text;
+  }
+
+  final text = (keywords ?? '').toString().trim();
+
+  return text.isEmpty ? '-' : text;
+}
+
 class HistoryDetailPage extends StatefulWidget {
   const HistoryDetailPage({super.key});
 
@@ -47,7 +184,7 @@ class _HistoryDetailPageState extends State<HistoryDetailPage> {
               style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
             ),
             Text(
-              'Ranking rekomendasi user',
+              'Ringkasan rekomendasi wisata',
               style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
             ),
           ],
@@ -106,13 +243,12 @@ class _DetailHero extends StatelessWidget {
   const _DetailHero({required this.item, required this.top});
 
   final RecommendationHistoryItem item;
-  final Map<String, dynamic>? top;
+  final Map? top;
 
   @override
   Widget build(BuildContext context) {
     final imageUrl = top?['link_gambar']?.toString();
     final mapsUrl = top?['link_google_maps']?.toString();
-    final score = top?['final_score']?.toString() ?? '-';
 
     return Container(
       decoration: BoxDecoration(
@@ -179,7 +315,7 @@ class _DetailHero extends StatelessWidget {
                                   borderRadius: BorderRadius.circular(999),
                                 ),
                                 child: const Text(
-                                  '🏆 Top Recommendation',
+                                  '🏆 Pilihan Utama',
                                   style: TextStyle(
                                     color: Color(0xFF020617),
                                     fontSize: 11,
@@ -211,6 +347,7 @@ class _DetailHero extends StatelessWidget {
                           ),
                         ),
                         Container(
+                          constraints: const BoxConstraints(maxWidth: 116),
                           padding: const EdgeInsets.symmetric(
                             horizontal: 14,
                             vertical: 10,
@@ -222,7 +359,7 @@ class _DetailHero extends StatelessWidget {
                           child: Column(
                             children: [
                               const Text(
-                                'Score',
+                                'Status',
                                 style: TextStyle(
                                   color: Color(0xFF64748B),
                                   fontSize: 11,
@@ -230,10 +367,12 @@ class _DetailHero extends StatelessWidget {
                                 ),
                               ),
                               Text(
-                                score,
+                                _recommendationStatus(top, 1),
+                                textAlign: TextAlign.center,
                                 style: const TextStyle(
                                   color: Color(0xFF020617),
-                                  fontSize: 20,
+                                  fontSize: 14,
+                                  height: 1.1,
                                   fontWeight: FontWeight.w900,
                                 ),
                               ),
@@ -257,19 +396,20 @@ class _DetailHero extends StatelessWidget {
                   runSpacing: 10,
                   children: [
                     _DarkMetric(
-                      label: 'Status',
-                      value: item.isSuccess ? 'Success' : 'Failed',
+                      label: 'Status Pencarian',
+                      value: _friendlyStatus(item.isSuccess),
                     ),
-                    _DarkMetric(label: 'Cuaca', value: item.weatherUsed ?? '-'),
                     _DarkMetric(
-                      label: 'Candidates',
+                      label: 'Cuaca Saat Itu',
+                      value: _formatWeather(item.weatherUsed),
+                    ),
+                    _DarkMetric(
+                      label: 'Pilihan Tersedia',
                       value: (item.totalCandidates ?? '-').toString(),
                     ),
                     _DarkMetric(
-                      label: 'Response',
-                      value: item.responseTimeMs == null
-                          ? '-'
-                          : '${item.responseTimeMs} ms',
+                      label: 'Kondisi Kunjungan',
+                      value: _visitConditionLabel(top),
                     ),
                   ],
                 ),
@@ -326,7 +466,7 @@ class _ParameterCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Preferensi yang Digunakan',
+            'Pilihan yang Kamu Gunakan',
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w900,
@@ -335,7 +475,7 @@ class _ParameterCard extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           const Text(
-            'Ringkasan parameter user saat request rekomendasi dibuat.',
+            'Ringkasan pilihan yang kamu masukkan saat mencari rekomendasi wisata.',
             style: TextStyle(
               color: Color(0xFF64748B),
               fontWeight: FontWeight.w600,
@@ -349,29 +489,26 @@ class _ParameterCard extends StatelessWidget {
               _LightMetric(label: 'Kategori', value: item.categoriesLabel),
               _LightMetric(label: 'Lokasi', value: item.locationLabel),
               _LightMetric(
-                label: 'Min Rating',
-                value: (payload['min_rating'] ?? '-').toString(),
+                label: 'Rating Minimal',
+                value: _payloadText(payload, 'min_rating'),
               ),
               _LightMetric(
-                label: 'Top N',
-                value: (payload['top_n'] ?? '-').toString(),
+                label: 'Jumlah Pilihan',
+                value: _payloadText(payload, 'top_n'),
               ),
               _LightMetric(
-                label: 'Hari',
-                value: (payload['visit_day'] ?? '-').toString(),
+                label: 'Hari Kunjungan',
+                value: _visitDayLabel(payload['visit_day']),
               ),
               _LightMetric(
-                label: 'BMKG',
+                label: 'Cuaca Otomatis',
                 value: payload['use_bmkg'] == true ? 'Aktif' : 'Manual',
               ),
               _LightMetric(
-                label: 'High Season',
-                value: payload['is_high_season'] == true ? 'Ya' : 'Tidak',
+                label: 'Musim Ramai',
+                value: _yesNoLabel(payload['is_high_season']),
               ),
-              _LightMetric(
-                label: 'ADM4',
-                value: (payload['bmkg_adm4'] ?? '-').toString(),
-              ),
+              _LightMetric(label: 'Kata Kunci', value: _keywordText(payload)),
             ],
           ),
         ],
@@ -394,11 +531,11 @@ class _RankingHeader extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Ranking Rekomendasi',
+                'Pilihan Wisata yang Cocok',
                 style: TextStyle(fontSize: 21, fontWeight: FontWeight.w900),
               ),
               Text(
-                'Diurutkan berdasarkan final score tertinggi.',
+                'Destinasi paling atas adalah pilihan yang paling direkomendasikan.',
                 style: TextStyle(
                   color: Color(0xFF64748B),
                   fontSize: 12,
@@ -415,7 +552,7 @@ class _RankingHeader extends StatelessWidget {
             borderRadius: BorderRadius.circular(999),
           ),
           child: Text(
-            'Total $total',
+            '$total pilihan',
             style: const TextStyle(
               color: Colors.white,
               fontSize: 12,
@@ -432,12 +569,13 @@ class _RankingCard extends StatelessWidget {
   const _RankingCard({required this.rank, required this.item});
 
   final int rank;
-  final Map<String, dynamic> item;
+  final Map item;
 
   @override
   Widget build(BuildContext context) {
     final imageUrl = item['link_gambar']?.toString();
     final mapsUrl = item['link_google_maps']?.toString();
+    final reason = _friendlyReason(item);
 
     return Container(
       decoration: BoxDecoration(
@@ -489,7 +627,7 @@ class _RankingCard extends StatelessWidget {
                         borderRadius: BorderRadius.circular(999),
                       ),
                       child: Text(
-                        '#$rank',
+                        rank == 1 ? 'Pilihan Utama' : 'Rekomendasi',
                         style: TextStyle(
                           color: rank == 1
                               ? const Color(0xFF020617)
@@ -530,12 +668,37 @@ class _RankingCard extends StatelessWidget {
                             ],
                           ),
                         ),
-                        Text(
-                          (item['final_score'] ?? '-').toString(),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 21,
-                            fontWeight: FontWeight.w900,
+                        Container(
+                          constraints: const BoxConstraints(maxWidth: 112),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.92),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Column(
+                            children: [
+                              const Text(
+                                'Status',
+                                style: TextStyle(
+                                  color: Color(0xFF64748B),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              Text(
+                                _recommendationStatus(item, rank),
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  color: Color(0xFF020617),
+                                  fontSize: 13,
+                                  height: 1.1,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
@@ -554,6 +717,7 @@ class _RankingCard extends StatelessWidget {
                   spacing: 8,
                   runSpacing: 8,
                   children: [
+                    if (rank == 1) const _GoldBadge(text: 'Paling Cocok'),
                     _BlueBadge(text: (item['kategori'] ?? '-').toString()),
                     _GrayBadge(text: (item['tipe_wisata'] ?? '-').toString()),
                   ],
@@ -581,22 +745,23 @@ class _RankingCard extends StatelessWidget {
                   children: [
                     Expanded(
                       child: _LightMetric(
-                        label: 'CBF',
-                        value: (item['cbf_score'] ?? '-').toString(),
+                        label: 'Kesesuaian',
+                        value: _suitabilityLabel(item),
                       ),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
                       child: _LightMetric(
-                        label: 'Context',
-                        value: (item['context_multiplier'] ?? '-').toString(),
+                        label: 'Kondisi',
+                        value: _visitConditionLabel(item),
                       ),
                     ),
                   ],
                 ),
-                if ((item['alasan'] ?? '').toString().isNotEmpty) ...[
+                if (reason.isNotEmpty) ...[
                   const SizedBox(height: 12),
                   Container(
+                    width: double.infinity,
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
                       color: const Color(0xFFF8FAFC),
@@ -604,7 +769,7 @@ class _RankingCard extends StatelessWidget {
                       border: Border.all(color: const Color(0xFFE2E8F0)),
                     ),
                     child: Text(
-                      (item['alasan'] ?? '').toString(),
+                      reason,
                       style: const TextStyle(
                         color: Color(0xFF475569),
                         height: 1.45,
@@ -719,7 +884,7 @@ class _LightMetric extends StatelessWidget {
           const SizedBox(height: 5),
           Text(
             value,
-            maxLines: 2,
+            maxLines: 3,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
               color: Color(0xFF020617),
@@ -779,6 +944,29 @@ class _GrayBadge extends StatelessWidget {
   );
 }
 
+class _GoldBadge extends StatelessWidget {
+  const _GoldBadge({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+    decoration: BoxDecoration(
+      color: const Color(0xFFFEF3C7),
+      borderRadius: BorderRadius.circular(999),
+    ),
+    child: Text(
+      text,
+      style: const TextStyle(
+        color: Color(0xFFB45309),
+        fontSize: 11,
+        fontWeight: FontWeight.w900,
+      ),
+    ),
+  );
+}
+
 class _ImageFallback extends StatelessWidget {
   const _ImageFallback();
 
@@ -810,7 +998,7 @@ class _NoRecommendationCard extends StatelessWidget {
         border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
       child: const Text(
-        'Tidak ada rekomendasi pada riwayat ini.',
+        'Belum ada pilihan wisata pada riwayat ini.',
         textAlign: TextAlign.center,
         style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w700),
       ),
