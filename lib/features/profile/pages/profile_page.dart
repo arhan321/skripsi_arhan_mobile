@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/routes/app_routes.dart';
 import '../../../core/storage/token_storage.dart';
+import '../../../shared/widgets/tourhub_sidebar.dart';
 import '../data/profile_api.dart';
 
 class ProfilePage extends StatefulWidget {
@@ -119,7 +120,6 @@ class _ProfilePageState extends State<ProfilePage> {
       );
     } catch (error) {
       if (!mounted) return;
-
       _showSnack(error.toString().replaceFirst('Exception: ', ''));
     } finally {
       if (mounted) setState(() => _isSaving = false);
@@ -148,23 +148,18 @@ class _ProfilePageState extends State<ProfilePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF3F7FB),
+      drawer: TourHubSidebar(activeMenu: TourHubSidebarMenu.profile),
+      drawerEnableOpenDragGesture: true,
       appBar: AppBar(
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.white,
         titleSpacing: 0,
-        leading: IconButton(
-          onPressed: () {
-            if (Navigator.canPop(context)) {
-              Navigator.pop(context);
-            } else {
-              Navigator.pushNamedAndRemoveUntil(
-                context,
-                AppRoutes.dashboard,
-                (_) => false,
-              );
-            }
-          },
-          icon: const Icon(Icons.arrow_back_rounded),
+        leading: Builder(
+          builder: (context) => IconButton(
+            tooltip: 'Menu',
+            onPressed: () => Scaffold.of(context).openDrawer(),
+            icon: const Icon(Icons.menu_rounded),
+          ),
         ),
         title: InkWell(
           onTap: () => Navigator.pushNamedAndRemoveUntil(
@@ -180,6 +175,8 @@ class _ProfilePageState extends State<ProfilePage> {
               children: [
                 Text(
                   'TourHub Bali',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: Color(0xFF020617),
                     fontSize: 18,
@@ -188,6 +185,8 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
                 Text(
                   'Edit Profile User',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: Color(0xFF64748B),
                     fontSize: 11,
@@ -198,24 +197,7 @@ class _ProfilePageState extends State<ProfilePage> {
             ),
           ),
         ),
-        actions: [
-          IconButton(
-            tooltip: 'Dashboard',
-            onPressed: () => Navigator.pushNamedAndRemoveUntil(
-              context,
-              AppRoutes.dashboard,
-              (_) => false,
-            ),
-            icon: const Icon(Icons.dashboard_rounded),
-          ),
-          IconButton(
-            tooltip: 'Rekomendasi',
-            onPressed: () =>
-                Navigator.pushNamed(context, AppRoutes.recommendation),
-            icon: const Icon(Icons.travel_explore_rounded),
-          ),
-          const SizedBox(width: 8),
-        ],
+        actions: const [SizedBox(width: 12)],
       ),
       body: RefreshIndicator(
         onRefresh: _loadProfile,
