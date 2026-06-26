@@ -117,10 +117,7 @@ class RecommendationApi {
 }
 
 class _SimpleResponse {
-  const _SimpleResponse({
-    required this.statusCode,
-    required this.body,
-  });
+  const _SimpleResponse({required this.statusCode, required this.body});
 
   final int statusCode;
   final String body;

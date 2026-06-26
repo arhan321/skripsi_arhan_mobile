@@ -10,6 +10,7 @@ import '../../features/recommendation/pages/history_detail_page.dart';
 import '../../features/recommendation/pages/history_page.dart';
 import '../../features/recommendation/pages/recommendation_page.dart';
 import '../../features/user/pages/user_dashboard_page.dart';
+import '../../features/wishlist/pages/wishlist_page.dart';
 
 final class AppRoutes {
   const AppRoutes._();
@@ -24,6 +25,7 @@ final class AppRoutes {
   static const String recommendation = '/recommendation';
   static const String history = '/history';
   static const String historyDetail = '/history/detail';
+  static const String wishlist = '/wishlist';
 
   static Map<String, WidgetBuilder> get routes => {
     landing: (_) => const LandingPage(),
@@ -36,5 +38,6 @@ final class AppRoutes {
     recommendation: (_) => const RecommendationPage(),
     history: (_) => const HistoryPage(),
     historyDetail: (_) => const HistoryDetailPage(),
+    wishlist: (_) => const WishlistPage(),
   };
 }

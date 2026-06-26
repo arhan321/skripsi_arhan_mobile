@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/routes/app_routes.dart';
 import '../../../core/utils/maps_launcher.dart';
 import '../data/recommendation_history_api.dart';
 import '../data/recommendation_history_model.dart';
+import '../../../shared/widgets/tourhub_sidebar.dart';
+import '../../wishlist/widgets/wishlist_toggle_button.dart';
 
 String _friendlyStatus(bool isSuccess) {
   return isSuccess ? 'Berhasil' : 'Belum Berhasil';
@@ -172,10 +175,19 @@ class _HistoryDetailPageState extends State<HistoryDetailPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF3F6FA),
+      drawer: const TourHubSidebar(activeMenu: TourHubSidebarMenu.history),
+      drawerEnableOpenDragGesture: true,
       appBar: AppBar(
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.white,
         titleSpacing: 0,
+        leading: Builder(
+          builder: (context) => IconButton(
+            tooltip: 'Menu',
+            onPressed: () => Scaffold.of(context).openDrawer(),
+            icon: const Icon(Icons.menu_rounded),
+          ),
+        ),
         title: const Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -189,6 +201,14 @@ class _HistoryDetailPageState extends State<HistoryDetailPage> {
             ),
           ],
         ),
+        actions: [
+          IconButton(
+            tooltip: 'Wishlist',
+            onPressed: () => Navigator.pushNamed(context, AppRoutes.wishlist),
+            icon: const Icon(Icons.star_rounded),
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
       body: FutureBuilder<RecommendationHistoryItem>(
         future: _future,
@@ -228,7 +248,11 @@ class _HistoryDetailPageState extends State<HistoryDetailPage> {
                 ...recommendations.asMap().entries.map(
                   (entry) => Padding(
                     padding: const EdgeInsets.only(bottom: 14),
-                    child: _RankingCard(rank: entry.key + 1, item: entry.value),
+                    child: _RankingCard(
+                      rank: entry.key + 1,
+                      item: entry.value,
+                      logId: item.id,
+                    ),
                   ),
                 ),
             ],
@@ -247,8 +271,9 @@ class _DetailHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final imageUrl = top?['link_gambar']?.toString();
-    final mapsUrl = top?['link_google_maps']?.toString();
+    final topMap = top == null ? null : Map<String, dynamic>.from(top!);
+    final imageUrl = topMap?['link_gambar']?.toString();
+    final mapsUrl = topMap?['link_google_maps']?.toString();
 
     return Container(
       decoration: BoxDecoration(
@@ -413,8 +438,15 @@ class _DetailHero extends StatelessWidget {
                     ),
                   ],
                 ),
-                if (mapsUrl != null && mapsUrl.trim().isNotEmpty) ...[
+                if (topMap != null) ...[
                   const SizedBox(height: 14),
+                  WishlistToggleButton(
+                    destination: topMap,
+                    recommendationLogId: item.id,
+                  ),
+                ],
+                if (mapsUrl != null && mapsUrl.trim().isNotEmpty) ...[
+                  const SizedBox(height: 10),
                   SizedBox(
                     width: double.infinity,
                     height: 48,
@@ -566,10 +598,15 @@ class _RankingHeader extends StatelessWidget {
 }
 
 class _RankingCard extends StatelessWidget {
-  const _RankingCard({required this.rank, required this.item});
+  const _RankingCard({
+    required this.rank,
+    required this.item,
+    required this.logId,
+  });
 
   final int rank;
-  final Map item;
+  final Map<String, dynamic> item;
+  final int logId;
 
   @override
   Widget build(BuildContext context) {
@@ -779,30 +816,44 @@ class _RankingCard extends StatelessWidget {
                     ),
                   ),
                 ],
-                if (mapsUrl != null && mapsUrl.trim().isNotEmpty) ...[
-                  const SizedBox(height: 14),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: ElevatedButton.icon(
-                      onPressed: () => openGoogleMapsUrl(context, mapsUrl),
-                      icon: const Icon(Icons.map_outlined, size: 19),
-                      label: const Text('Buka Google Maps'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF059669),
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(18),
-                        ),
-                        textStyle: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w900,
-                        ),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Expanded(
+                      child: WishlistToggleButton(
+                        destination: item,
+                        recommendationLogId: logId,
+                        compact: true,
                       ),
                     ),
-                  ),
-                ],
+                    if (mapsUrl != null && mapsUrl.trim().isNotEmpty) ...[
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: SizedBox(
+                          height: 48,
+                          child: ElevatedButton.icon(
+                            onPressed: () =>
+                                openGoogleMapsUrl(context, mapsUrl),
+                            icon: const Icon(Icons.map_outlined, size: 19),
+                            label: const Text('Maps'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF059669),
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(18),
+                              ),
+                              textStyle: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
               ],
             ),
           ),

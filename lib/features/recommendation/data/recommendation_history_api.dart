@@ -36,7 +36,11 @@ class RecommendationHistoryApi {
 
     return rows
         .whereType<Map>()
-        .map((item) => RecommendationHistoryItem.fromJson(Map<String, dynamic>.from(item)))
+        .map(
+          (item) => RecommendationHistoryItem.fromJson(
+            Map<String, dynamic>.from(item),
+          ),
+        )
         .toList();
   }
 
@@ -77,7 +81,10 @@ class RecommendationHistoryApi {
     return token;
   }
 
-  static Future<_SimpleResponse> _getJson(Uri uri, {required String token}) async {
+  static Future<_SimpleResponse> _getJson(
+    Uri uri, {
+    required String token,
+  }) async {
     final client = HttpClient();
 
     try {
@@ -88,7 +95,10 @@ class RecommendationHistoryApi {
       final response = await request.close();
       final responseBody = await response.transform(utf8.decoder).join();
 
-      return _SimpleResponse(statusCode: response.statusCode, body: responseBody);
+      return _SimpleResponse(
+        statusCode: response.statusCode,
+        body: responseBody,
+      );
     } finally {
       client.close(force: true);
     }
@@ -99,7 +109,8 @@ class RecommendationHistoryApi {
       final decoded = jsonDecode(body);
       if (decoded is Map<String, dynamic>) {
         final message = decoded['message'];
-        if (message != null && message.toString().trim().isNotEmpty) return message.toString();
+        if (message != null && message.toString().trim().isNotEmpty)
+          return message.toString();
 
         final errors = decoded['errors'];
         if (errors is Map && errors.isNotEmpty) {

@@ -173,6 +173,14 @@ class _HistoryPageState extends State<HistoryPage> {
             ),
           ],
         ),
+        actions: [
+          IconButton(
+            tooltip: 'Wishlist',
+            onPressed: () => Navigator.pushNamed(context, AppRoutes.wishlist),
+            icon: const Icon(Icons.star_rounded),
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
       body: RefreshIndicator(
         onRefresh: _refresh,

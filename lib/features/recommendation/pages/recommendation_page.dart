@@ -4,6 +4,7 @@ import '../../../core/routes/app_routes.dart';
 import '../../../core/storage/token_storage.dart';
 import '../../../core/utils/maps_launcher.dart';
 import '../../auth/data/auth_api.dart';
+import '../../wishlist/widgets/wishlist_toggle_button.dart';
 import '../data/recommendation_api.dart';
 import '../data/tourhub_location.dart';
 import '../../../shared/widgets/tourhub_sidebar.dart';
@@ -174,7 +175,14 @@ class _RecommendationPageState extends State<RecommendationPage> {
             ),
           ),
         ),
-        actions: const [SizedBox(width: 12)],
+        actions: [
+          IconButton(
+            tooltip: 'Wishlist',
+            onPressed: () => Navigator.pushNamed(context, AppRoutes.wishlist),
+            icon: const Icon(Icons.star_rounded),
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
       body: RefreshIndicator(
         onRefresh: () async {
@@ -1184,30 +1192,43 @@ class _RecommendationItemCard extends StatelessWidget {
                     ),
                   ),
                 ],
-                if (mapsUrl != null && mapsUrl.trim().isNotEmpty) ...[
-                  const SizedBox(height: 14),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: ElevatedButton.icon(
-                      onPressed: () => openGoogleMapsUrl(context, mapsUrl),
-                      icon: const Icon(Icons.map_outlined, size: 19),
-                      label: const Text('Buka Google Maps'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF059669),
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(18),
-                        ),
-                        textStyle: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w900,
-                        ),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Expanded(
+                      child: WishlistToggleButton(
+                        destination: item,
+                        compact: true,
                       ),
                     ),
-                  ),
-                ],
+                    if (mapsUrl != null && mapsUrl.trim().isNotEmpty) ...[
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: SizedBox(
+                          height: 48,
+                          child: ElevatedButton.icon(
+                            onPressed: () =>
+                                openGoogleMapsUrl(context, mapsUrl),
+                            icon: const Icon(Icons.map_outlined, size: 19),
+                            label: const Text('Maps'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF059669),
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(18),
+                              ),
+                              textStyle: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
               ],
             ),
           ),

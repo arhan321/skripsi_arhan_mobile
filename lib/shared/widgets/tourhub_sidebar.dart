@@ -3,7 +3,13 @@ import 'package:flutter/material.dart';
 import '../../core/routes/app_routes.dart';
 import '../../features/auth/data/auth_api.dart';
 
-enum TourHubSidebarMenu { dashboard, recommendation, history, profile }
+enum TourHubSidebarMenu {
+  dashboard,
+  recommendation,
+  history,
+  wishlist,
+  profile,
+}
 
 class TourHubSidebar extends StatelessWidget {
   const TourHubSidebar({super.key, required this.activeMenu});
@@ -68,6 +74,13 @@ class TourHubSidebar extends StatelessWidget {
                     onTap: () => _goTo(context, AppRoutes.history),
                   ),
                   _SidebarItem(
+                    icon: Icons.star_rounded,
+                    title: 'Wishlist',
+                    subtitle: 'Destinasi wisata yang kamu simpan',
+                    isActive: activeMenu == TourHubSidebarMenu.wishlist,
+                    onTap: () => _goTo(context, AppRoutes.wishlist),
+                  ),
+                  _SidebarItem(
                     icon: Icons.person_rounded,
                     title: 'Profil',
                     subtitle: 'Kelola informasi akun kamu',
@@ -99,7 +112,7 @@ class TourHubSidebar extends StatelessWidget {
                         SizedBox(width: 10),
                         Expanded(
                           child: Text(
-                            'TourHub membantu kamu mencari destinasi wisata Bali yang sesuai preferensi.',
+                            'TourHub membantu kamu mencari dan menyimpan destinasi wisata Bali yang sesuai preferensi.',
                             style: TextStyle(
                               color: Color(0xFF475569),
                               height: 1.35,

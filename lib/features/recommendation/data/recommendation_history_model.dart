@@ -29,7 +29,9 @@ class RecommendationHistoryItem {
       status: (json['status'] ?? '-').toString(),
       weatherSource: json['weather_source']?.toString(),
       weatherUsed: json['weather_used']?.toString(),
-      totalCandidates: int.tryParse((json['total_candidates'] ?? '').toString()),
+      totalCandidates: int.tryParse(
+        (json['total_candidates'] ?? '').toString(),
+      ),
       responseTimeMs: int.tryParse((json['response_time_ms'] ?? '').toString()),
       createdAt: DateTime.tryParse((json['created_at'] ?? '').toString()),
       requestPayload: _mapFromDynamic(json['request_payload']),
@@ -49,8 +51,10 @@ class RecommendationHistoryItem {
         .map((item) => Map<String, dynamic>.from(item))
         .toList()
       ..sort((a, b) {
-        final scoreA = double.tryParse((a['final_score'] ?? '0').toString()) ?? 0;
-        final scoreB = double.tryParse((b['final_score'] ?? '0').toString()) ?? 0;
+        final scoreA =
+            double.tryParse((a['final_score'] ?? '0').toString()) ?? 0;
+        final scoreB =
+            double.tryParse((b['final_score'] ?? '0').toString()) ?? 0;
         return scoreB.compareTo(scoreA);
       });
   }
