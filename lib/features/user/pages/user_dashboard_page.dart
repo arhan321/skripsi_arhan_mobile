@@ -360,7 +360,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
               const _TipsCard(),
               const SizedBox(height: 16),
               _HistoryPreviewSection(
-                histories: (data?.histories ?? const []).take(5).toList(),
+                histories: (data?.histories ?? const []).toList(),
                 onOpenDetail: _openDetail,
               ),
               const SizedBox(height: 82),
