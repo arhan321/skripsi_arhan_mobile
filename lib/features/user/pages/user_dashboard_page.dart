@@ -4,6 +4,7 @@ import '../../../core/routes/app_routes.dart';
 import '../../auth/data/auth_api.dart';
 import '../../recommendation/data/recommendation_history_api.dart';
 import '../../recommendation/data/recommendation_history_model.dart';
+import '../../system_rating/widgets/system_rating_feedback_section.dart';
 import '../../../shared/widgets/tourhub_sidebar.dart';
 
 String _friendlyStatus(bool isSuccess) =>
@@ -256,6 +257,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
   Widget build(BuildContext context) {
     final data = _data;
     final latest = data?.latestHistory;
+    final latestSuccessfulHistory = data?.latestSuccessfulHistory;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF3F7FB),
@@ -344,6 +346,17 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
                 userName: data?.userName ?? 'Wisatawan',
                 totalSearch: data?.total ?? 0,
               ),
+              if (latestSuccessfulHistory != null) ...[
+                const SizedBox(height: 16),
+                TourHubSystemRatingSection(
+                  recommendationLogId: latestSuccessfulHistory.id,
+                  source: 'mobile_dashboard_page',
+                  mode: SystemRatingSectionMode.promptOnly,
+                  onChanged: () {
+                    _refreshDashboard();
+                  },
+                ),
+              ],
               const SizedBox(height: 16),
               _StatsGrid(
                 data: data ?? const _DashboardData(user: null, histories: []),
@@ -363,6 +376,17 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
                 histories: (data?.histories ?? const []).toList(),
                 onOpenDetail: _openDetail,
               ),
+              if (latestSuccessfulHistory != null) ...[
+                const SizedBox(height: 16),
+                TourHubSystemRatingSection(
+                  recommendationLogId: latestSuccessfulHistory.id,
+                  source: 'mobile_dashboard_page',
+                  mode: SystemRatingSectionMode.thankYouOnly,
+                  onChanged: () {
+                    _refreshDashboard();
+                  },
+                ),
+              ],
               const SizedBox(height: 82),
             ],
           ],
@@ -447,6 +471,14 @@ class _DashboardData {
   RecommendationHistoryItem? get latestHistory {
     if (histories.isEmpty) return null;
     return histories.first;
+  }
+
+  RecommendationHistoryItem? get latestSuccessfulHistory {
+    for (final item in histories) {
+      if (item.isSuccess) return item;
+    }
+
+    return null;
   }
 }
 

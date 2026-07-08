@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/routes/app_routes.dart';
 import '../data/recommendation_history_api.dart';
 import '../data/recommendation_history_model.dart';
+import '../../system_rating/widgets/system_rating_feedback_section.dart';
 import '../../../shared/widgets/tourhub_sidebar.dart';
 
 String _friendlyStatus(bool isSuccess) =>
@@ -118,6 +119,18 @@ String _payloadText(
   return text.isEmpty ? fallback : text;
 }
 
+RecommendationHistoryItem? _latestSuccessfulHistory(
+  List<RecommendationHistoryItem> items,
+) {
+  for (final item in items) {
+    if (item.isSuccess) {
+      return item;
+    }
+  }
+
+  return null;
+}
+
 class HistoryPage extends StatefulWidget {
   const HistoryPage({super.key});
 
@@ -209,11 +222,21 @@ class _HistoryPageState extends State<HistoryPage> {
             }
 
             final items = snapshot.data ?? const <RecommendationHistoryItem>[];
+            final latestSuccessfulHistory = _latestSuccessfulHistory(items);
 
             return ListView(
               padding: const EdgeInsets.all(18),
               children: [
                 _HeroHistoryCard(total: items.length),
+                if (latestSuccessfulHistory != null) ...[
+                  const SizedBox(height: 16),
+                  TourHubSystemRatingSection(
+                    recommendationLogId: latestSuccessfulHistory.id,
+                    source: 'mobile_history_page',
+                    mode: SystemRatingSectionMode.promptOnly,
+                    compact: true,
+                  ),
+                ],
                 const SizedBox(height: 16),
                 if (items.isEmpty)
                   const _EmptyState()

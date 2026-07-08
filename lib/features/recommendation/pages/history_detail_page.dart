@@ -73,51 +73,102 @@ String _yesNoLabel(dynamic value) {
   return 'Tidak';
 }
 
+String _cleanReadableText(dynamic value) {
+  final text = (value ?? '').toString().trim();
+
+  if (text.isEmpty || text == '-') return '-';
+
+  final lower = text.toLowerCase();
+
+  switch (lower) {
+    case 'outdoor':
+      return 'Luar Ruangan';
+    case 'indoor':
+      return 'Dalam Ruangan';
+    case 'mixed':
+      return 'Fleksibel';
+    case 'weekday':
+      return 'Hari Biasa';
+    case 'weekend':
+      return 'Akhir Pekan';
+    case 'unknown':
+      return 'Tidak Diketahui';
+    default:
+      final words = text
+          .replaceAll('_', ' ')
+          .replaceAll('-', ' ')
+          .split(RegExp(r'\s+'))
+          .where((word) => word.trim().isNotEmpty)
+          .map((word) {
+            final clean = word.trim();
+            if (clean.isEmpty) return clean;
+            return '${clean[0].toUpperCase()}${clean.substring(1).toLowerCase()}';
+          })
+          .join(' ');
+
+      return words.isEmpty ? '-' : words;
+  }
+}
+
+String _formatFriendlyNumber(dynamic value) {
+  final number = double.tryParse((value ?? '').toString());
+
+  if (number == null) return '-';
+
+  final rounded = number.round().toString();
+
+  return rounded.replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => '.');
+}
+
+String _formatFriendlyRating(dynamic value) {
+  final rating = double.tryParse((value ?? '').toString());
+
+  if (rating == null || rating <= 0) return '-';
+
+  final text = rating.toStringAsFixed(1);
+
+  return text.endsWith('.0') ? text.substring(0, text.length - 2) : text;
+}
+
 String _friendlyReason(Map item) {
-  var reason = (item['alasan'] ?? '').toString().trim();
+  final category = _cleanReadableText(item['kategori']);
+  final type = _cleanReadableText(item['tipe_wisata']);
+  final rating = _formatFriendlyRating(item['rating']);
+  final reviews = _formatFriendlyNumber(item['jumlah_rating']);
+  final suitability = _suitabilityLabel(item).toLowerCase();
+  final visitCondition = _visitConditionLabel(item).toLowerCase();
 
-  if (reason.isEmpty) return '';
+  final sentences = <String>[];
 
-  reason = reason.replaceAll(
-    RegExp(r'\s*\(\s*CBF\s*=\s*[^\)]*\)', caseSensitive: false),
-    '',
-  );
-  reason = reason.replaceAll(
-    RegExp(r'\s*CBF\s*=\s*[0-9\.]+\s*;?', caseSensitive: false),
-    '',
-  );
-  reason = reason.replaceAll(
-    RegExp(r'\s*context\s*=\s*[0-9\.]+\s*;?', caseSensitive: false),
-    '',
-  );
-  reason = reason.replaceAll(
-    RegExp(r'\s*final score\s*[^;\.]*[;\.]?', caseSensitive: false),
-    '',
+  final categoryText = category == '-'
+      ? ''
+      : ' untuk wisata ${category.toLowerCase()}';
+
+  sentences.add(
+    'Destinasi ini $suitability dengan preferensi pencarianmu$categoryText.',
   );
 
-  final replacements = <String, String>{
-    'cocok dengan fitur/preferensi user': 'Cocok dengan preferensi pencarianmu',
-    'fitur/preferensi user': 'preferensi pencarianmu',
-    'user': 'kamu',
-    'outdoor': 'luar ruangan',
-    'indoor': 'dalam ruangan',
-    'mixed': 'fleksibel',
-    'weekend': 'akhir pekan',
-    'weekday': 'hari biasa',
-  };
+  if (rating != '-' && reviews != '-') {
+    sentences.add(
+      'Tempat ini memiliki rating $rating dan didukung $reviews ulasan pengunjung.',
+    );
+  } else if (rating != '-') {
+    sentences.add('Tempat ini memiliki rating $rating dari pengunjung.');
+  } else if (reviews != '-') {
+    sentences.add('Tempat ini sudah memiliki $reviews ulasan pengunjung.');
+  }
 
-  replacements.forEach((from, to) {
-    reason = reason.replaceAll(RegExp(from, caseSensitive: false), to);
-  });
+  if (type != '-') {
+    sentences.add(
+      'Jenis kunjungannya $type, sehingga bisa disesuaikan dengan rencana perjalananmu.',
+    );
+  }
 
-  reason = reason.replaceAll(RegExp(r'\s+'), ' ');
-  reason = reason.replaceAll(RegExp(r'\s*;\s*'), '; ');
-  reason = reason.replaceAll(RegExp(r';\s*;'), ';');
-  reason = reason.trim().replaceAll(RegExp(r'^[;\.\s]+|[;\.\s]+$'), '');
+  sentences.add(
+    'Kondisi kunjungan saat itu $visitCondition, jadi destinasi ini layak dipertimbangkan untuk perjalananmu.',
+  );
 
-  if (reason.isEmpty) return '';
-
-  return '${reason[0].toUpperCase()}${reason.substring(1)}.';
+  return sentences.join(' ');
 }
 
 String _payloadText(Map payload, String key, {String fallback = '-'}) {
@@ -789,7 +840,7 @@ class _RankingCard extends StatelessWidget {
                     const SizedBox(width: 10),
                     Expanded(
                       child: _LightMetric(
-                        label: 'Kondisi',
+                        label: 'Kondisi Kunjungan',
                         value: _visitConditionLabel(item),
                       ),
                     ),

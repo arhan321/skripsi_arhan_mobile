@@ -5,6 +5,7 @@ import '../../../core/storage/token_storage.dart';
 import '../../../core/utils/maps_launcher.dart';
 import '../../auth/data/auth_api.dart';
 import '../../wishlist/widgets/wishlist_toggle_button.dart';
+import '../../system_rating/widgets/system_rating_prompt_sheet.dart';
 import '../data/recommendation_api.dart';
 import '../data/tourhub_location.dart';
 import '../../../shared/widgets/tourhub_sidebar.dart';
@@ -82,6 +83,11 @@ class _RecommendationPageState extends State<RecommendationPage> {
       setState(() => _result = Map<String, dynamic>.from(response));
 
       _showSnack('Rekomendasi wisata berhasil ditemukan.');
+
+      await TourHubSystemRatingPrompt.maybeShow(
+        context: context,
+        recommendationResponse: Map<dynamic, dynamic>.from(response),
+      );
     } catch (error) {
       final message = error.toString().replaceFirst('Exception: ', '');
 
@@ -318,28 +324,78 @@ String _visitDayLabel(String value) {
 String _friendlyReason(Map<String, dynamic> item) {
   var reason = (item['alasan'] ?? '').toString().trim();
 
-  if (reason.isEmpty) return '';
+  if (reason.isEmpty) {
+    return _buildFriendlyReasonFromScores(item);
+  }
+
+  /*
+   * Bagian ini sengaja dibuat untuk menyaring istilah teknis dari backend.
+   * Mobile app tidak perlu menampilkan istilah seperti CBF, context, final score,
+   * atau angka formula rekomendasi kepada user.
+   */
+  final containsTechnicalTerms = RegExp(
+    r'\b(CBF|final\s*score|context|multiplier|cosine|tf[-\s]?idf|tfidf)\b',
+    caseSensitive: false,
+  ).hasMatch(reason);
+
+  if (containsTechnicalTerms) {
+    return _buildFriendlyReasonFromScores(item);
+  }
 
   reason = reason.replaceAll(
     RegExp(r'\s*\(\s*CBF\s*=\s*[^\)]*\)', caseSensitive: false),
     '',
   );
   reason = reason.replaceAll(
-    RegExp(r'\s*CBF\s*=\s*[0-9\.]+\s*;?', caseSensitive: false),
+    RegExp(
+      r'\s*(?:dengan\s+)?(?:skor\s*)?CBF(?:\s*score)?\s*[:=]?\s*[0-9]+(?:[\.,][0-9]+)?\s*;?',
+      caseSensitive: false,
+    ),
     '',
   );
   reason = reason.replaceAll(
-    RegExp(r'\s*context\s*=\s*[0-9\.]+\s*;?', caseSensitive: false),
+    RegExp(
+      r'\s*(?:context|context\s*multiplier)\s*[:=]?\s*[0-9]+(?:[\.,][0-9]+)?\s*;?',
+      caseSensitive: false,
+    ),
     '',
   );
   reason = reason.replaceAll(
-    RegExp(r'\s*final score\s*[^;\.]*[;\.]?', caseSensitive: false),
+    RegExp(r'\s*final\s*score\s*[^;\.]*[;\.]?', caseSensitive: false),
+    '',
+  );
+  reason = reason.replaceAll(
+    RegExp(r'\s*skor\s+akhir\s*[^;\.]*[;\.]?', caseSensitive: false),
     '',
   );
 
+  reason = reason.replaceAllMapped(
+    RegExp(
+      r'\brating\s*[:=]?\s*([0-9]+(?:[\.,][0-9]+)?)\s*;?',
+      caseSensitive: false,
+    ),
+    (match) => 'memiliki rating ${match.group(1)}, ',
+  );
+
+  reason = reason.replaceAllMapped(
+    RegExp(r'\bjumlah\s+rating\s*[:=]?\s*([0-9]+)\s*;?', caseSensitive: false),
+    (match) {
+      final total = int.tryParse(match.group(1) ?? '');
+      final label = total == null
+          ? (match.group(1) ?? '-')
+          : _friendlyNumber(total);
+      return 'didukung $label ulasan pengunjung, ';
+    },
+  );
+
   final replacements = <String, String>{
-    'cocok dengan fitur/preferensi user': 'Cocok dengan preferensi pencarianmu',
+    'Destinasi memiliki kesesuaian preferensi':
+        'Destinasi ini sesuai dengan preferensi pencarianmu',
+    'destinasi memiliki kesesuaian preferensi':
+        'Destinasi ini sesuai dengan preferensi pencarianmu',
+    'cocok dengan fitur/preferensi user': 'cocok dengan preferensi pencarianmu',
     'fitur/preferensi user': 'preferensi pencarianmu',
+    'preferensi user': 'preferensi pencarianmu',
     'user': 'kamu',
     'outdoor': 'luar ruangan',
     'indoor': 'dalam ruangan',
@@ -353,13 +409,80 @@ String _friendlyReason(Map<String, dynamic> item) {
   });
 
   reason = reason.replaceAll(RegExp(r'\s+'), ' ');
+  reason = reason.replaceAll(RegExp(r'\s*,\s*'), ', ');
+  reason = reason.replaceAll(RegExp(r',\s*,'), ',');
   reason = reason.replaceAll(RegExp(r'\s*;\s*'), '; ');
   reason = reason.replaceAll(RegExp(r';\s*;'), ';');
-  reason = reason.trim().replaceAll(RegExp(r'^[;\.\s]+|[;\.\s]+$'), '');
+  reason = reason.trim().replaceAll(RegExp(r'^[,;\.\s]+|[,;\.\s]+$'), '');
 
-  if (reason.isEmpty) return '';
+  if (reason.isEmpty) {
+    return _buildFriendlyReasonFromScores(item);
+  }
 
   return '${reason[0].toUpperCase()}${reason.substring(1)}.';
+}
+
+String _buildFriendlyReasonFromScores(Map<String, dynamic> item) {
+  final parts = <String>[];
+
+  parts.add(
+    'Destinasi ini ${_suitabilityLabel(item).toLowerCase()} dengan preferensi pencarianmu',
+  );
+
+  final rating = double.tryParse((item['rating'] ?? '').toString());
+  if (rating != null && rating > 0) {
+    parts.add('memiliki rating ${_prettyDecimal(rating, maxDigits: 1)}');
+  }
+
+  final totalReviews = int.tryParse((item['jumlah_rating'] ?? '').toString());
+  if (totalReviews != null && totalReviews > 0) {
+    parts.add('didukung ${_friendlyNumber(totalReviews)} ulasan pengunjung');
+  }
+
+  final condition = _visitConditionLabel(item).toLowerCase();
+  if (condition.isNotEmpty) {
+    parts.add('kondisi kunjungan $condition');
+  }
+
+  final category = (item['kategori'] ?? '').toString().trim();
+  if (category.isNotEmpty && category != '-') {
+    parts.add('cocok untuk wisata ${category.toLowerCase()}');
+  }
+
+  return '${parts.join(', ')}.';
+}
+
+String _prettyDecimal(double value, {int maxDigits = 1}) {
+  final fixed = value.toStringAsFixed(maxDigits);
+  return fixed.replaceAll(RegExp(r'\.?0+$'), '');
+}
+
+String _friendlyNumber(int value) {
+  return value.toString().replaceAllMapped(
+    RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
+    (match) => '${match.group(1)}.',
+  );
+}
+
+String _tourismTypeLabel(dynamic value) {
+  final normalized = (value ?? '').toString().trim().toLowerCase();
+
+  switch (normalized) {
+    case 'indoor':
+      return 'Dalam Ruangan';
+    case 'outdoor':
+      return 'Luar Ruangan';
+    case 'mixed':
+      return 'Fleksibel';
+    default:
+      if (normalized.isEmpty || normalized == '-') return '-';
+
+      return normalized
+          .split(RegExp(r'[\s_\-]+'))
+          .where((word) => word.isNotEmpty)
+          .map((word) => '${word[0].toUpperCase()}${word.substring(1)}')
+          .join(' ');
+  }
 }
 
 class _HeroCard extends StatelessWidget {
@@ -1133,7 +1256,7 @@ class _RecommendationItemCard extends StatelessWidget {
                     if (rank == 1)
                       const _GoldBadge(text: 'Paling Direkomendasikan'),
                     _BlueBadge(text: (item['kategori'] ?? '-').toString()),
-                    _GrayBadge(text: (item['tipe_wisata'] ?? '-').toString()),
+                    _GrayBadge(text: _tourismTypeLabel(item['tipe_wisata'])),
                   ],
                 ),
                 const SizedBox(height: 14),

@@ -306,9 +306,148 @@ class _WishlistDestinationCard extends StatelessWidget {
   final bool isDeleting;
   final VoidCallback onDelete;
 
+  String _formatTourismType(String? value) {
+    final text = (value ?? '').trim().toLowerCase();
+
+    if (text.isEmpty) return '-';
+
+    switch (text) {
+      case 'outdoor':
+        return 'Luar Ruangan';
+      case 'indoor':
+        return 'Dalam Ruangan';
+      case 'mixed':
+        return 'Campuran';
+      default:
+        return value ?? '-';
+    }
+  }
+
+  String _cleanReason(String? value) {
+    var text = (value ?? '').trim();
+
+    if (text.isEmpty) {
+      return '';
+    }
+
+    text = text.replaceAll(
+      RegExp(r'\(\s*CBF\s*=\s*[\d.,]+\s*\)', caseSensitive: false),
+      '',
+    );
+
+    text = text.replaceAll(
+      RegExp(r'\bCBF\s*[:=]\s*[\d.,]+;?\s*', caseSensitive: false),
+      '',
+    );
+
+    text = text.replaceAll(
+      RegExp(r'\bCARS\s*[:=]\s*[\d.,]+;?\s*', caseSensitive: false),
+      '',
+    );
+
+    text = text.replaceAll(
+      RegExp(
+        r'\bfinal[_\s-]*score\s*[:=]\s*[\d.,]+;?\s*',
+        caseSensitive: false,
+      ),
+      '',
+    );
+
+    text = text.replaceAll(
+      RegExp(r'\bbase[_\s-]*score\s*[:=]\s*[\d.,]+;?\s*', caseSensitive: false),
+      '',
+    );
+
+    text = text.replaceAll(
+      RegExp(
+        r'\bcontext[_\s-]*multiplier\s*[:=]\s*[\d.,]+;?\s*',
+        caseSensitive: false,
+      ),
+      '',
+    );
+
+    text = text.replaceAll(
+      RegExp(
+        r'\brating[_\s-]*score\s*[:=]\s*[\d.,]+;?\s*',
+        caseSensitive: false,
+      ),
+      '',
+    );
+
+    text = text.replaceAll(
+      RegExp(
+        r'\bpopularity[_\s-]*score\s*[:=]\s*[\d.,]+;?\s*',
+        caseSensitive: false,
+      ),
+      '',
+    );
+
+    text = text.replaceAll(
+      RegExp(r'\bfitur/preferensi user\b', caseSensitive: false),
+      'pilihan wisatamu',
+    );
+
+    text = text.replaceAll(
+      RegExp(r'\bpreferensi user\b', caseSensitive: false),
+      'pilihan wisatamu',
+    );
+
+    text = text.replaceAll(RegExp(r'\buser\b', caseSensitive: false), 'kamu');
+
+    text = text.replaceAll(
+      RegExp(r'\boutdoor\b', caseSensitive: false),
+      'luar ruangan',
+    );
+
+    text = text.replaceAll(
+      RegExp(r'\bindoor\b', caseSensitive: false),
+      'dalam ruangan',
+    );
+
+    text = text.replaceAll(
+      RegExp(r'\bmixed\b', caseSensitive: false),
+      'campuran',
+    );
+
+    text = text.replaceAll(
+      RegExp(
+        r'\bcuaca cerah mendukung destinasi luar ruangan\b',
+        caseSensitive: false,
+      ),
+      'cuaca cerah cocok untuk destinasi luar ruangan',
+    );
+
+    text = text.replaceAll(
+      RegExp(
+        r'\bcuaca hujan kurang mendukung destinasi luar ruangan\b',
+        caseSensitive: false,
+      ),
+      'cuaca hujan kurang cocok untuk destinasi luar ruangan',
+    );
+
+    text = text.replaceAll(RegExp(r'\s+;'), ';');
+    text = text.replaceAll(RegExp(r';\s*;'), ';');
+    text = text.replaceAll(RegExp(r'\s+'), ' ').trim();
+
+    if (text.startsWith(';')) {
+      text = text.substring(1).trim();
+    }
+
+    if (text.endsWith(';')) {
+      text = text.substring(0, text.length - 1).trim();
+    }
+
+    if (text.isEmpty) {
+      return 'Destinasi ini sesuai dengan pilihan wisatamu.';
+    }
+
+    return text[0].toUpperCase() + text.substring(1);
+  }
+
   @override
   Widget build(BuildContext context) {
     final imageUrl = item.imageUrl;
+    final displayReason = _cleanReason(item.reason);
 
     return Container(
       clipBehavior: Clip.antiAlias,
@@ -413,7 +552,7 @@ class _WishlistDestinationCard extends StatelessWidget {
                   children: [
                     _Chip(label: item.category ?? '-'),
                     const SizedBox(width: 8),
-                    _Chip(label: item.tourismType ?? '-'),
+                    _Chip(label: _formatTourismType(item.tourismType)),
                   ],
                 ),
                 const SizedBox(height: 14),
@@ -428,7 +567,7 @@ class _WishlistDestinationCard extends StatelessWidget {
                     ),
                   ],
                 ),
-                if ((item.reason ?? '').isNotEmpty) ...[
+                if (displayReason.isNotEmpty) ...[
                   const SizedBox(height: 14),
                   Container(
                     width: double.infinity,
@@ -439,7 +578,7 @@ class _WishlistDestinationCard extends StatelessWidget {
                       border: Border.all(color: const Color(0xFFFDE68A)),
                     ),
                     child: Text(
-                      item.reason!,
+                      displayReason,
                       maxLines: 4,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
