@@ -32,15 +32,12 @@ final class TourHubSystemRatingPrompt {
       return false;
     }
 
-    final requiresRating = _extractBool(
-      recommendationResponse,
-      const [
-        'requires_system_rating',
-        'data.requires_system_rating',
-        'rating_prompt.show',
-        'data.rating_prompt.show',
-      ],
-    );
+    final requiresRating = _extractBool(recommendationResponse, const [
+      'requires_system_rating',
+      'data.requires_system_rating',
+      'rating_prompt.show',
+      'data.rating_prompt.show',
+    ]);
 
     // Kalau backend eksplisit bilang tidak perlu rating, modal jangan tampil.
     if (requiresRating == false) {
@@ -57,15 +54,12 @@ final class TourHubSystemRatingPrompt {
       return false;
     }
 
-    final recommendationLogId = _extractInt(
-      recommendationResponse,
-      const [
-        'recommendation_log_id',
-        'data.recommendation_log_id',
-        'rating_prompt.recommendation_log_id',
-        'data.rating_prompt.recommendation_log_id',
-      ],
-    );
+    final recommendationLogId = _extractInt(recommendationResponse, const [
+      'recommendation_log_id',
+      'data.recommendation_log_id',
+      'rating_prompt.recommendation_log_id',
+      'data.rating_prompt.recommendation_log_id',
+    ]);
 
     final result = await showModalBottomSheet<bool>(
       context: context,
@@ -90,16 +84,13 @@ final class TourHubSystemRatingPrompt {
     final recommendations = rootRecommendations is List
         ? rootRecommendations
         : dataRecommendations is List
-            ? dataRecommendations
-            : const [];
+        ? dataRecommendations
+        : const [];
 
     return recommendations.isNotEmpty;
   }
 
-  static bool? _extractBool(
-    Map<dynamic, dynamic> source,
-    List<String> paths,
-  ) {
+  static bool? _extractBool(Map<dynamic, dynamic> source, List<String> paths) {
     for (final path in paths) {
       final value = _readPath(source, path);
 
@@ -127,10 +118,7 @@ final class TourHubSystemRatingPrompt {
     return null;
   }
 
-  static int? _extractInt(
-    Map<dynamic, dynamic> source,
-    List<String> paths,
-  ) {
+  static int? _extractInt(Map<dynamic, dynamic> source, List<String> paths) {
     for (final path in paths) {
       final value = _readPath(source, path);
 
@@ -175,10 +163,12 @@ final class _SystemRatingPromptSheet extends StatefulWidget {
   final int? recommendationLogId;
 
   @override
-  State<_SystemRatingPromptSheet> createState() => _SystemRatingPromptSheetState();
+  State<_SystemRatingPromptSheet> createState() =>
+      _SystemRatingPromptSheetState();
 }
 
-final class _SystemRatingPromptSheetState extends State<_SystemRatingPromptSheet> {
+final class _SystemRatingPromptSheetState
+    extends State<_SystemRatingPromptSheet> {
   final TextEditingController _commentController = TextEditingController();
 
   int _selectedRating = 0;
@@ -271,13 +261,18 @@ final class _SystemRatingPromptSheetState extends State<_SystemRatingPromptSheet
                   ),
                 ),
                 const SizedBox(height: 18),
-                _Header(onClose: _isSubmitting ? null : () => Navigator.pop(context, false)),
+                _Header(
+                  onClose: _isSubmitting
+                      ? null
+                      : () => Navigator.pop(context, false),
+                ),
                 const SizedBox(height: 20),
                 _RatingSelector(
                   selectedRating: _selectedRating,
                   onChanged: (value) {
+                    final safeValue = value.clamp(1, 5).toInt();
                     setState(() {
-                      _selectedRating = value;
+                      _selectedRating = safeValue;
                       _errorMessage = null;
                     });
                   },
@@ -307,7 +302,10 @@ final class _SystemRatingPromptSheetState extends State<_SystemRatingPromptSheet
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(22),
-                      borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.4),
+                      borderSide: const BorderSide(
+                        color: Color(0xFF2563EB),
+                        width: 1.4,
+                      ),
                     ),
                   ),
                 ),
@@ -335,7 +333,9 @@ final class _SystemRatingPromptSheetState extends State<_SystemRatingPromptSheet
                   children: [
                     Expanded(
                       child: OutlinedButton(
-                        onPressed: _isSubmitting ? null : () => Navigator.pop(context, false),
+                        onPressed: _isSubmitting
+                            ? null
+                            : () => Navigator.pop(context, false),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: const Color(0xFF475569),
                           side: const BorderSide(color: Color(0xFFE2E8F0)),
@@ -343,7 +343,9 @@ final class _SystemRatingPromptSheetState extends State<_SystemRatingPromptSheet
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(18),
                           ),
-                          textStyle: const TextStyle(fontWeight: FontWeight.w900),
+                          textStyle: const TextStyle(
+                            fontWeight: FontWeight.w900,
+                          ),
                         ),
                         child: const Text('Nanti saja'),
                       ),
@@ -362,7 +364,9 @@ final class _SystemRatingPromptSheetState extends State<_SystemRatingPromptSheet
                                 ),
                               )
                             : const Icon(Icons.send_rounded),
-                        label: Text(_isSubmitting ? 'Mengirim...' : 'Kirim Rating'),
+                        label: Text(
+                          _isSubmitting ? 'Mengirim...' : 'Kirim Rating',
+                        ),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF020617),
                           foregroundColor: Colors.white,
@@ -371,7 +375,9 @@ final class _SystemRatingPromptSheetState extends State<_SystemRatingPromptSheet
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(18),
                           ),
-                          textStyle: const TextStyle(fontWeight: FontWeight.w900),
+                          textStyle: const TextStyle(
+                            fontWeight: FontWeight.w900,
+                          ),
                         ),
                       ),
                     ),
@@ -466,8 +472,17 @@ final class _RatingSelector extends StatelessWidget {
   final int selectedRating;
   final ValueChanged<int> onChanged;
 
+  int get _safeSelectedRating => selectedRating.clamp(0, 5).toInt();
+
+  void _safeChange(int value) {
+    final safeValue = value.clamp(1, 5).toInt();
+    onChanged(safeValue);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final safeRating = _safeSelectedRating;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -480,65 +495,84 @@ final class _RatingSelector extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        Row(
-          children: List.generate(5, (index) {
-            final value = index + 1;
-            final active = selectedRating >= value;
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final itemGap = constraints.maxWidth < 340 ? 5.0 : 7.0;
+            final itemHeight = constraints.maxWidth < 340 ? 62.0 : 68.0;
 
-            return Expanded(
-              child: Padding(
-                padding: EdgeInsets.only(right: value == 5 ? 0 : 7),
-                child: InkWell(
-                  onTap: () => onChanged(value),
-                  borderRadius: BorderRadius.circular(18),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 220),
-                    curve: Curves.easeOutBack,
-                    height: 68,
-                    decoration: BoxDecoration(
-                      color: active ? const Color(0xFFFBBF24) : const Color(0xFFF8FAFC),
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(
-                        color: active ? const Color(0xFFF59E0B) : const Color(0xFFE2E8F0),
-                      ),
-                      boxShadow: active
-                          ? [
-                              BoxShadow(
-                                color: const Color(0xFFF59E0B).withOpacity(0.20),
-                                blurRadius: 18,
-                                offset: const Offset(0, 8),
-                              ),
-                            ]
-                          : const [],
-                    ),
-                    child: AnimatedScale(
-                      duration: const Duration(milliseconds: 180),
-                      scale: active ? 1.10 : 1.0,
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            active ? Icons.star_rounded : Icons.star_border_rounded,
-                            color: active ? const Color(0xFF020617) : const Color(0xFF94A3B8),
-                            size: 28,
-                          ),
-                          const SizedBox(height: 3),
-                          Text(
-                            '$value/5',
-                            style: TextStyle(
-                              color: active ? const Color(0xFF020617) : const Color(0xFF64748B),
-                              fontSize: 10,
-                              fontWeight: FontWeight.w900,
+            return Row(
+              children: List.generate(5, (index) {
+                final value = index + 1;
+                final active = safeRating >= value;
+
+                return Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.only(right: value == 5 ? 0 : itemGap),
+                    child: Semantics(
+                      button: true,
+                      selected: active,
+                      label: 'Rating $value dari 5',
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () => _safeChange(value),
+                        child: Container(
+                          height: itemHeight,
+                          decoration: BoxDecoration(
+                            color: active
+                                ? const Color(0xFFFBBF24)
+                                : const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(
+                              color: active
+                                  ? const Color(0xFFF59E0B)
+                                  : const Color(0xFFE2E8F0),
+                              width: active ? 1.4 : 1,
                             ),
+                            boxShadow: active
+                                ? [
+                                    BoxShadow(
+                                      color: const Color(
+                                        0xFFF59E0B,
+                                      ).withOpacity(0.14),
+                                      blurRadius: 14,
+                                      offset: const Offset(0, 6),
+                                    ),
+                                  ]
+                                : const [],
                           ),
-                        ],
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                active
+                                    ? Icons.star_rounded
+                                    : Icons.star_border_rounded,
+                                color: active
+                                    ? const Color(0xFF020617)
+                                    : const Color(0xFF94A3B8),
+                                size: constraints.maxWidth < 340 ? 24 : 28,
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                '$value/5',
+                                style: TextStyle(
+                                  color: active
+                                      ? const Color(0xFF020617)
+                                      : const Color(0xFF64748B),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ),
+                );
+              }),
             );
-          }),
+          },
         ),
       ],
     );
@@ -552,13 +586,13 @@ final class _LiveRatingInfo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final label = _ratingLabel(rating);
-    final description = _ratingDescription(rating);
-    final emoji = _ratingEmoji(rating);
-    final progress = (rating.clamp(0, 5) * 20).toDouble();
+    final safeRating = rating.clamp(0, 5).toInt();
+    final label = _ratingLabel(safeRating);
+    final description = _ratingDescription(safeRating);
+    final emoji = _ratingEmoji(safeRating);
+    final progress = safeRating / 5.0;
 
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 240),
+    return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(24),
@@ -570,19 +604,15 @@ final class _LiveRatingInfo extends StatelessWidget {
       ),
       child: Row(
         children: [
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 220),
-            child: Container(
-              key: ValueKey(emoji),
-              width: 54,
-              height: 54,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(18),
-              ),
-              child: Text(emoji, style: const TextStyle(fontSize: 28)),
+          Container(
+            width: 54,
+            height: 54,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(18),
             ),
+            child: Text(emoji, style: const TextStyle(fontSize: 28)),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -608,13 +638,25 @@ final class _LiveRatingInfo extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 12),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(999),
-                  child: LinearProgressIndicator(
-                    minHeight: 9,
-                    value: progress / 100,
-                    backgroundColor: Colors.white.withOpacity(0.14),
-                    valueColor: const AlwaysStoppedAnimation(Color(0xFFFBBF24)),
+                Container(
+                  height: 9,
+                  width: double.infinity,
+                  clipBehavior: Clip.antiAlias,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.14),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: FractionallySizedBox(
+                      widthFactor: progress.clamp(0.0, 1.0),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFBBF24),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ],

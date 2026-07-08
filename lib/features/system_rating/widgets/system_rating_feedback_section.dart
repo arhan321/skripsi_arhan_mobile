@@ -38,10 +38,12 @@ final class TourHubSystemRatingSection extends StatefulWidget {
   final VoidCallback? onChanged;
 
   @override
-  State<TourHubSystemRatingSection> createState() => _TourHubSystemRatingSectionState();
+  State<TourHubSystemRatingSection> createState() =>
+      _TourHubSystemRatingSectionState();
 }
 
-final class _TourHubSystemRatingSectionState extends State<TourHubSystemRatingSection> {
+final class _TourHubSystemRatingSectionState
+    extends State<TourHubSystemRatingSection> {
   final TextEditingController _commentController = TextEditingController();
 
   late Future<SystemRatingStatus> _future;
@@ -103,7 +105,9 @@ final class _TourHubSystemRatingSectionState extends State<TourHubSystemRatingSe
         SnackBar(
           content: const Text('Terima kasih, rating sistem berhasil dikirim.'),
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
         ),
       );
 
@@ -153,10 +157,7 @@ final class _TourHubSystemRatingSectionState extends State<TourHubSystemRatingSe
         }
 
         if (hasRating) {
-          return _ThankYouRatingCard(
-            status: status!,
-            compact: widget.compact,
-          );
+          return _ThankYouRatingCard(status: status!, compact: widget.compact);
         }
 
         return _PromptRatingCard(
@@ -166,14 +167,87 @@ final class _TourHubSystemRatingSectionState extends State<TourHubSystemRatingSe
           commentController: _commentController,
           compact: widget.compact,
           onRatingChanged: (value) {
+            final safeValue = value.clamp(1, 5).toInt();
             setState(() {
-              _selectedRating = value;
+              _selectedRating = safeValue;
               _errorMessage = null;
             });
           },
           onSubmit: _submitRating,
         );
       },
+    );
+  }
+}
+
+final class _LoadingRatingCard extends StatelessWidget {
+  const _LoadingRatingCard({required this.compact});
+
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(compact ? 16 : 18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(compact ? 24 : 30),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withOpacity(0.05),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            height: 42,
+            width: 42,
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFFBEB),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFFDE68A)),
+            ),
+            child: const Center(
+              child: SizedBox(
+                height: 18,
+                width: 18,
+                child: CircularProgressIndicator(strokeWidth: 2.2),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Memeriksa status rating sistem...',
+                  style: TextStyle(
+                    color: Color(0xFF020617),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  'TourHub sedang mengecek apakah kamu sudah pernah memberi rating.',
+                  style: TextStyle(
+                    color: Color(0xFF64748B),
+                    fontSize: 12,
+                    height: 1.35,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -288,7 +362,8 @@ final class _PromptRatingCard extends StatelessWidget {
             maxLength: 1000,
             decoration: InputDecoration(
               labelText: 'Komentar tambahan',
-              hintText: 'Contoh: rekomendasinya sudah sesuai dan mudah digunakan.',
+              hintText:
+                  'Contoh: rekomendasinya sudah sesuai dan mudah digunakan.',
               alignLabelWithHint: true,
               filled: true,
               fillColor: Colors.white,
@@ -303,7 +378,10 @@ final class _PromptRatingCard extends StatelessWidget {
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(20),
-                borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.4),
+                borderSide: const BorderSide(
+                  color: Color(0xFF2563EB),
+                  width: 1.4,
+                ),
               ),
             ),
           ),
@@ -348,7 +426,9 @@ final class _PromptRatingCard extends StatelessWidget {
                 backgroundColor: const Color(0xFF020617),
                 foregroundColor: Colors.white,
                 disabledBackgroundColor: const Color(0xFF94A3B8),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(18),
+                ),
                 textStyle: const TextStyle(fontWeight: FontWeight.w900),
               ),
             ),
@@ -403,7 +483,10 @@ final class _ThankYouRatingCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(18),
                   border: Border.all(color: const Color(0xFFA7F3D0)),
                 ),
-                child: const Icon(Icons.check_circle_rounded, color: Color(0xFF059669)),
+                child: const Icon(
+                  Icons.check_circle_rounded,
+                  color: Color(0xFF059669),
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -445,7 +528,10 @@ final class _ThankYouRatingCard extends StatelessWidget {
               ),
               const SizedBox(width: 10),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(20),
@@ -521,72 +607,101 @@ final class _ThankYouRatingCard extends StatelessWidget {
 }
 
 final class _InlineStarPicker extends StatelessWidget {
-  const _InlineStarPicker({required this.selectedRating, required this.onChanged});
+  const _InlineStarPicker({
+    required this.selectedRating,
+    required this.onChanged,
+  });
 
   final int selectedRating;
   final ValueChanged<int> onChanged;
 
+  int get _safeSelectedRating => selectedRating.clamp(0, 5).toInt();
+
+  void _safeChange(int value) {
+    final safeValue = value.clamp(1, 5).toInt();
+    onChanged(safeValue);
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: List.generate(5, (index) {
-        final value = index + 1;
-        final active = selectedRating >= value;
+    final safeRating = _safeSelectedRating;
 
-        return Expanded(
-          child: Padding(
-            padding: EdgeInsets.only(right: value == 5 ? 0 : 7),
-            child: InkWell(
-              onTap: () => onChanged(value),
-              borderRadius: BorderRadius.circular(18),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 220),
-                curve: Curves.easeOutBack,
-                height: 68,
-                decoration: BoxDecoration(
-                  color: active ? const Color(0xFFFBBF24) : const Color(0xFFFFFFFF),
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(
-                    color: active ? const Color(0xFFF59E0B) : const Color(0xFFE2E8F0),
-                  ),
-                  boxShadow: active
-                      ? [
-                          BoxShadow(
-                            color: const Color(0xFFF59E0B).withOpacity(0.18),
-                            blurRadius: 18,
-                            offset: const Offset(0, 8),
-                          ),
-                        ]
-                      : const [],
-                ),
-                child: AnimatedScale(
-                  duration: const Duration(milliseconds: 180),
-                  scale: active ? 1.10 : 1.0,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.star_rounded,
-                        color: active ? const Color(0xFF020617) : const Color(0xFF94A3B8),
-                        size: 26,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '$value/5',
-                        style: TextStyle(
-                          color: active ? const Color(0xFF020617) : const Color(0xFF94A3B8),
-                          fontSize: 10,
-                          fontWeight: FontWeight.w900,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final itemGap = constraints.maxWidth < 340 ? 5.0 : 7.0;
+        final itemHeight = constraints.maxWidth < 340 ? 62.0 : 68.0;
+
+        return Row(
+          children: List.generate(5, (index) {
+            final value = index + 1;
+            final active = safeRating >= value;
+
+            return Expanded(
+              child: Padding(
+                padding: EdgeInsets.only(right: value == 5 ? 0 : itemGap),
+                child: Semantics(
+                  button: true,
+                  selected: active,
+                  label: 'Rating $value dari 5',
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => _safeChange(value),
+                    child: Container(
+                      height: itemHeight,
+                      decoration: BoxDecoration(
+                        color: active ? const Color(0xFFFBBF24) : Colors.white,
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(
+                          color: active
+                              ? const Color(0xFFF59E0B)
+                              : const Color(0xFFE2E8F0),
+                          width: active ? 1.4 : 1,
                         ),
+                        boxShadow: active
+                            ? [
+                                BoxShadow(
+                                  color: const Color(
+                                    0xFFF59E0B,
+                                  ).withOpacity(0.14),
+                                  blurRadius: 14,
+                                  offset: const Offset(0, 6),
+                                ),
+                              ]
+                            : const [],
                       ),
-                    ],
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            active
+                                ? Icons.star_rounded
+                                : Icons.star_border_rounded,
+                            color: active
+                                ? const Color(0xFF020617)
+                                : const Color(0xFF94A3B8),
+                            size: constraints.maxWidth < 340 ? 24 : 26,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '$value/5',
+                            style: TextStyle(
+                              color: active
+                                  ? const Color(0xFF020617)
+                                  : const Color(0xFF94A3B8),
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ),
-            ),
-          ),
+            );
+          }),
         );
-      }),
+      },
     );
   }
 }
@@ -598,9 +713,10 @@ final class _LiveRatingCaption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final label = _ratingLabel(rating);
-    final description = _ratingDescription(rating);
-    final progress = (rating.clamp(0, 5) / 5.0).toDouble();
+    final safeRating = rating.clamp(0, 5).toInt();
+    final label = _ratingLabel(safeRating);
+    final description = _ratingDescription(safeRating);
+    final progress = safeRating / 5.0;
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -619,7 +735,7 @@ final class _LiveRatingCaption extends StatelessWidget {
             ),
             child: Center(
               child: Text(
-                _ratingEmoji(rating),
+                _ratingEmoji(safeRating),
                 style: const TextStyle(fontSize: 24),
               ),
             ),
@@ -648,50 +764,28 @@ final class _LiveRatingCaption extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 9),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(999),
-                  child: LinearProgressIndicator(
-                    value: progress,
-                    minHeight: 8,
-                    color: const Color(0xFFFBBF24),
-                    backgroundColor: Colors.white.withOpacity(0.12),
+                Container(
+                  height: 8,
+                  width: double.infinity,
+                  clipBehavior: Clip.antiAlias,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: FractionallySizedBox(
+                      widthFactor: progress.clamp(0.0, 1.0),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFBBF24),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-final class _LoadingRatingCard extends StatelessWidget {
-  const _LoadingRatingCard({required this.compact});
-
-  final bool compact;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.all(compact ? 14 : 18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(compact ? 22 : 28),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: const Row(
-        children: [
-          SizedBox(
-            width: 18,
-            height: 18,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
-          SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              'Mengecek status rating sistem...',
-              style: TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF64748B)),
             ),
           ),
         ],
